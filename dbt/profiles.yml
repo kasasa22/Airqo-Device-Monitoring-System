@@ -1,0 +1,12 @@
+my_profile:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost  # Replace with your database host if different
+      user: ''  # Replace with your user
+      password: ''  # Replace with your password
+      dbname: ''  # Replace with your database name
+      schema: public  # Default schema for your models
+      threads: 1  # Number of threads dbt should use
+      port: 5432  # Default Postgres port

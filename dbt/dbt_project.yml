@@ -1,0 +1,22 @@
+name: 'Airqo_project'  # Project name
+version: '1.0.0'
+profile: 'my_profile'  # Will link to profiles.yml later
+
+# Directories where dbt will look for files
+source-paths: ["models"]
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_modules"
+
+# Additional directories for dbt to use
+analysis-paths: ["analyses"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+snapshot-paths: ["snapshots"]
+seed-paths: ["seeds"]
+
+# Configuring how dbt will run
+models:
+  Airqo_project:
+    +materialized: table  # Default materialization for models (table, view, incremental)
