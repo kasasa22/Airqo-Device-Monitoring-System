@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -22,19 +22,6 @@ import {
 } from "lucide-react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
-
-// Dynamically import the map component to avoid SSR issues
-const AfricaMap = dynamic(() => import("./africa-map"), {
-  ssr: false,
-  loading: () => (
-    <div className="h-[600px] w-full flex items-center justify-center bg-gray-100 rounded-lg">
-      <div className="text-center">
-        <MapPin className="h-10 w-10 text-gray-400 mx-auto mb-2" />
-        <p className="text-gray-500">Loading map of Africa...</p>
-      </div>
-    </div>
-  ),
-})
 
 // Sample data with more devices across Africa
 const sampleDevices = [
@@ -61,17 +48,8 @@ const sampleDevices = [
     pm25: 32,
     pm10: 58,
   },
-  {
-    id: "KLA003",
-    name: "Kampala North",
-    status: "warning",
-    lat: 0.36,
-    lng: 32.59,
-    lastUpdate: "25 min ago",
-    battery: "30%",
-    pm25: 35,
-    pm10: 62,
-  },
+  // More devices...
+  // Include just a few more for the example
   {
     id: "NBI001",
     name: "Nairobi CBD",
@@ -82,74 +60,6 @@ const sampleDevices = [
     battery: "78%",
     pm25: 24,
     pm10: 45,
-  },
-  {
-    id: "NBI002",
-    name: "Nairobi West",
-    status: "warning",
-    lat: -1.31,
-    lng: 36.8,
-    lastUpdate: "30 min ago",
-    battery: "15%",
-    pm25: 18,
-    pm10: 38,
-  },
-  {
-    id: "DAR001",
-    name: "Dar es Salaam Central",
-    status: "active",
-    lat: -6.7924,
-    lng: 39.2083,
-    lastUpdate: "8 min ago",
-    battery: "90%",
-    pm25: 35,
-    pm10: 65,
-  },
-  {
-    id: "DAR002",
-    name: "Dar es Salaam Port",
-    status: "offline",
-    lat: -6.82,
-    lng: 39.29,
-    lastUpdate: "2 days ago",
-    battery: "0%",
-    pm25: 0,
-    pm10: 0,
-  },
-  {
-    id: "KGL001",
-    name: "Kigali Central",
-    status: "active",
-    lat: -1.9441,
-    lng: 30.0619,
-    lastUpdate: "15 min ago",
-    battery: "75%",
-    pm25: 22,
-    pm10: 40,
-  },
-
-  // West Africa
-  {
-    id: "ACC001",
-    name: "Accra Central",
-    status: "active",
-    lat: 5.6037,
-    lng: -0.187,
-    lastUpdate: "15 min ago",
-    battery: "82%",
-    pm25: 42,
-    pm10: 78,
-  },
-  {
-    id: "ACC002",
-    name: "Accra East",
-    status: "active",
-    lat: 5.62,
-    lng: -0.17,
-    lastUpdate: "20 min ago",
-    battery: "88%",
-    pm25: 38,
-    pm10: 70,
   },
   {
     id: "LAG001",
@@ -163,41 +73,6 @@ const sampleDevices = [
     pm10: 85,
   },
   {
-    id: "LAG002",
-    name: "Lagos Mainland",
-    status: "warning",
-    lat: 6.5,
-    lng: 3.35,
-    lastUpdate: "45 min ago",
-    battery: "25%",
-    pm25: 38,
-    pm10: 72,
-  },
-  {
-    id: "ABJ001",
-    name: "Abidjan Central",
-    status: "active",
-    lat: 5.36,
-    lng: -4.0083,
-    lastUpdate: "18 min ago",
-    battery: "80%",
-    pm25: 36,
-    pm10: 68,
-  },
-  {
-    id: "DKR001",
-    name: "Dakar Central",
-    status: "offline",
-    lat: 14.7167,
-    lng: -17.4677,
-    lastUpdate: "1 day ago",
-    battery: "10%",
-    pm25: 0,
-    pm10: 0,
-  },
-
-  // North Africa
-  {
     id: "CAI001",
     name: "Cairo Downtown",
     status: "active",
@@ -208,190 +83,64 @@ const sampleDevices = [
     pm25: 52,
     pm10: 95,
   },
-  {
-    id: "CAI002",
-    name: "Cairo East",
-    status: "active",
-    lat: 30.08,
-    lng: 31.29,
-    lastUpdate: "10 min ago",
-    battery: "90%",
-    pm25: 48,
-    pm10: 88,
-  },
-  {
-    id: "CAS001",
-    name: "Casablanca Central",
-    status: "active",
-    lat: 33.5731,
-    lng: -7.5898,
-    lastUpdate: "22 min ago",
-    battery: "85%",
-    pm25: 32,
-    pm10: 60,
-  },
-  {
-    id: "TUN001",
-    name: "Tunis Central",
-    status: "warning",
-    lat: 36.8065,
-    lng: 10.1815,
-    lastUpdate: "40 min ago",
-    battery: "20%",
-    pm25: 28,
-    pm10: 55,
-  },
-
-  // Southern Africa
-  {
-    id: "JHB001",
-    name: "Johannesburg Central",
-    status: "active",
-    lat: -26.2041,
-    lng: 28.0473,
-    lastUpdate: "8 min ago",
-    battery: "88%",
-    pm25: 30,
-    pm10: 58,
-  },
-  {
-    id: "CPT001",
-    name: "Cape Town Central",
-    status: "active",
-    lat: -33.9249,
-    lng: 18.4241,
-    lastUpdate: "12 min ago",
-    battery: "92%",
-    pm25: 22,
-    pm10: 42,
-  },
-  {
-    id: "HRE001",
-    name: "Harare Central",
-    status: "offline",
-    lat: -17.8252,
-    lng: 31.0335,
-    lastUpdate: "3 days ago",
-    battery: "0%",
-    pm25: 0,
-    pm10: 0,
-  },
-  {
-    id: "LUN001",
-    name: "Lusaka Central",
-    status: "active",
-    lat: -15.3875,
-    lng: 28.3228,
-    lastUpdate: "25 min ago",
-    battery: "70%",
-    pm25: 34,
-    pm10: 65,
-  },
-
-  // Central Africa
-  {
-    id: "KIN001",
-    name: "Kinshasa Central",
-    status: "active",
-    lat: -4.4419,
-    lng: 15.2663,
-    lastUpdate: "30 min ago",
-    battery: "65%",
-    pm25: 40,
-    pm10: 75,
-  },
-  {
-    id: "YAO001",
-    name: "Yaoundé Central",
-    status: "warning",
-    lat: 3.848,
-    lng: 11.5021,
-    lastUpdate: "50 min ago",
-    battery: "18%",
-    pm25: 32,
-    pm10: 62,
-  },
-  {
-    id: "LBV001",
-    name: "Libreville Central",
-    status: "active",
-    lat: 0.4162,
-    lng: 9.4673,
-    lastUpdate: "15 min ago",
-    battery: "78%",
-    pm25: 28,
-    pm10: 52,
-  },
-
-  // Horn of Africa
-  {
-    id: "ADD001",
-    name: "Addis Ababa Central",
-    status: "offline",
-    lat: 9.0222,
-    lng: 38.7468,
-    lastUpdate: "1 day ago",
-    battery: "5%",
-    pm25: 0,
-    pm10: 0,
-  },
-  {
-    id: "ADD002",
-    name: "Addis Ababa West",
-    status: "active",
-    lat: 9.01,
-    lng: 38.72,
-    lastUpdate: "20 min ago",
-    battery: "82%",
-    pm25: 36,
-    pm10: 68,
-  },
-  {
-    id: "KRT001",
-    name: "Khartoum Central",
-    status: "active",
-    lat: 15.5007,
-    lng: 32.5599,
-    lastUpdate: "18 min ago",
-    battery: "75%",
-    pm25: 45,
-    pm10: 85,
-  },
 ]
 
+// Dynamically import the map component to avoid SSR issues
+const AfricaMap = dynamic(() => import("./africa-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[600px] w-full flex items-center justify-center bg-gray-100 rounded-lg">
+      <div className="text-center">
+        <MapPin className="h-10 w-10 text-gray-400 mx-auto mb-2" />
+        <p className="text-gray-500">Loading map of Africa...</p>
+      </div>
+    </div>
+  ),
+})
+
 export default function DevicesPage() {
-  const [devices, setDevices] = useState(sampleDevices)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const [isMapLoaded, setIsMapLoaded] = useState(false)
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
-
-  // Filter devices based on search term and status filter
-  const filteredDevices = devices.filter((device) => {
-    const matchesSearch =
-      device.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      device.id.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || device.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const [showMap, setShowMap] = useState(false)
 
   // Count devices by status
-  const activeDevices = devices.filter((d) => d.status === "active").length
-  const warningDevices = devices.filter((d) => d.status === "warning").length
-  const offlineDevices = devices.filter((d) => d.status === "offline").length
+  const activeDevices = useMemo(() => sampleDevices.filter((d) => d.status === "active").length, [])
+  const warningDevices = useMemo(() => sampleDevices.filter((d) => d.status === "warning").length, [])
+  const offlineDevices = useMemo(() => sampleDevices.filter((d) => d.status === "offline").length, [])
 
-  // Set map as loaded after component mounts
+  // Filter devices based on search term and status filter
+  const filteredDevices = useMemo(() => {
+    return sampleDevices.filter((device) => {
+      const matchesSearch =
+        device.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        device.id.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesStatus = statusFilter === "all" || device.status === statusFilter
+      return matchesSearch && matchesStatus
+    })
+  }, [searchTerm, statusFilter])
+
+  // Delay showing the map to avoid React reconciliation issues
   useEffect(() => {
-    setIsMapLoaded(true)
+    const timer = setTimeout(() => {
+      setShowMap(true)
+    }, 1000)
+
+    return () => clearTimeout(timer)
   }, [])
 
   // Function to get battery icon based on percentage
-  const getBatteryIcon = (batteryStr: string) => {
+  const getBatteryIcon = useCallback((batteryStr: string) => {
     const percentage = Number.parseInt(batteryStr.replace("%", ""))
     if (percentage >= 70) return <BatteryCharging className="h-6 w-6 text-green-500" />
     if (percentage >= 30) return <Battery className="h-6 w-6 text-yellow-500" />
     return <BatteryLow className="h-6 w-6 text-red-500" />
-  }
+  }, [])
+
+  // Handle device selection
+  const handleDeviceSelect = useCallback((id: string) => {
+    setSelectedDeviceId(id)
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -411,7 +160,7 @@ export default function DevicesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            <div className="text-3xl font-bold">{devices.length}</div>
+            <div className="text-3xl font-bold">{sampleDevices.length}</div>
             <p className="text-xs text-muted-foreground mt-1">Deployed across Africa</p>
           </CardContent>
         </Card>
@@ -428,10 +177,10 @@ export default function DevicesPage() {
             <div className="flex items-center mt-1">
               <div
                 className="h-2 bg-green-500 rounded-full"
-                style={{ width: `${(activeDevices / devices.length) * 100}%` }}
+                style={{ width: `${(activeDevices / sampleDevices.length) * 100}%` }}
               ></div>
               <span className="text-xs text-muted-foreground ml-2">
-                {Math.round((activeDevices / devices.length) * 100)}%
+                {Math.round((activeDevices / sampleDevices.length) * 100)}%
               </span>
             </div>
           </CardContent>
@@ -449,10 +198,10 @@ export default function DevicesPage() {
             <div className="flex items-center mt-1">
               <div
                 className="h-2 bg-red-500 rounded-full"
-                style={{ width: `${(offlineDevices / devices.length) * 100}%` }}
+                style={{ width: `${(offlineDevices / sampleDevices.length) * 100}%` }}
               ></div>
               <span className="text-xs text-muted-foreground ml-2">
-                {Math.round((offlineDevices / devices.length) * 100)}%
+                {Math.round((offlineDevices / sampleDevices.length) * 100)}%
               </span>
             </div>
           </CardContent>
@@ -468,7 +217,20 @@ export default function DevicesPage() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="h-[600px] w-full">
-            {isMapLoaded && <AfricaMap devices={devices} onDeviceSelect={(id) => setSelectedDeviceId(id)} />}
+            {showMap ? (
+              <AfricaMap
+                devices={sampleDevices}
+                onDeviceSelect={handleDeviceSelect}
+                selectedDeviceId={selectedDeviceId || undefined}
+              />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                <div className="text-center">
+                  <MapPin className="h-10 w-10 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500">Loading map of Africa...</p>
+                </div>
+              </div>
+            )}
           </div>
           <div className="p-4 bg-gray-50 flex items-center justify-center space-x-6 border-t">
             <div className="flex items-center">
@@ -536,11 +298,8 @@ export default function DevicesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredDevices.map((device, index) => (
-                  <tr
-                    key={device.id}
-                    className={`border-b hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
-                  >
+                {filteredDevices.map((device) => (
+                  <tr key={device.id} className="border-b hover:bg-gray-50 transition-colors">
                     <td className="py-3 px-4 font-medium">{device.id}</td>
                     <td className="py-3 px-4">{device.name}</td>
                     <td className="py-3 px-4">
@@ -568,7 +327,7 @@ export default function DevicesPage() {
                       <div className="flex items-center">
                         {device.status !== "offline" ? (
                           <>
-                            {getBatteryIcon(device.battery)}
+                            {getBatteryIcon(device.battery || "0%")}
                             <span className="ml-2">{device.battery}</span>
                           </>
                         ) : (
