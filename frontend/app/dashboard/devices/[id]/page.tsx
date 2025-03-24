@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -28,19 +28,6 @@ import {
 } from "lucide-react"
 import dynamic from "next/dynamic"
 
-// Dynamically import the map component
-const DeviceMap = dynamic(() => import("../device-map"), {
-  ssr: false,
-  loading: () => (
-    <div className="h-[300px] w-full flex items-center justify-center bg-gray-100 rounded-lg">
-      <div className="text-center">
-        <MapPin className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-        <p className="text-gray-500">Loading map...</p>
-      </div>
-    </div>
-  ),
-})
-
 // Sample device data
 const sampleDevices = [
   {
@@ -62,82 +49,7 @@ const sampleDevices = [
     location: "Kampala City Center, Uganda",
     description: "Monitoring air quality in central Kampala business district",
   },
-  {
-    id: "KLA002",
-    name: "Kampala East",
-    status: "active",
-    lat: 0.33,
-    lng: 32.61,
-    lastUpdate: "5 min ago",
-    battery: "92%",
-    pm25: 32,
-    pm10: 58,
-    temperature: 25.2,
-    humidity: 62,
-    installDate: "2023-06-10",
-    lastMaintenance: "2024-02-05",
-    firmwareVersion: "2.3.1",
-    signalStrength: "88%",
-    location: "Eastern Kampala, Uganda",
-    description: "Monitoring air quality in eastern residential areas",
-  },
-  {
-    id: "KLA003",
-    name: "Kampala North",
-    status: "warning",
-    lat: 0.36,
-    lng: 32.59,
-    lastUpdate: "25 min ago",
-    battery: "30%",
-    pm25: 35,
-    pm10: 62,
-    temperature: 26.1,
-    humidity: 58,
-    installDate: "2023-04-22",
-    lastMaintenance: "2024-01-15",
-    firmwareVersion: "2.3.0",
-    signalStrength: "65%",
-    location: "Northern Kampala, Uganda",
-    description: "Monitoring air quality in northern industrial zone",
-  },
-  {
-    id: "NBI001",
-    name: "Nairobi CBD",
-    status: "active",
-    lat: -1.2921,
-    lng: 36.8219,
-    lastUpdate: "12 min ago",
-    battery: "78%",
-    pm25: 24,
-    pm10: 45,
-    temperature: 22.8,
-    humidity: 70,
-    installDate: "2023-03-18",
-    lastMaintenance: "2024-02-10",
-    firmwareVersion: "2.3.1",
-    signalStrength: "90%",
-    location: "Nairobi Central Business District, Kenya",
-    description: "Monitoring air quality in central Nairobi",
-  },
-  {
-    id: "NBI002",
-    name: "Nairobi West",
-    status: "warning",
-    lat: -1.31,
-    lng: 36.8,
-    lastUpdate: "30 min ago",
-    battery: "15%",
-    pm25: 18,
-    pm10: 38,
-    temperature: 23.5,
-    humidity: 68,
-    installDate: "2023-07-05",
-    lastMaintenance: "2023-12-20",
-    firmwareVersion: "2.3.0",
-    signalStrength: "45%",
-    location: "Western Nairobi, Kenya",
-    description: "Monitoring air quality in western residential areas",
-  },
+  // More devices...
 ]
 
 // Sample historical data
@@ -179,12 +91,26 @@ const maintenanceHistory = [
   },
 ]
 
+// Dynamically import the map component with no SSR
+const DeviceMap = dynamic(() => import("../device-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[300px] w-full flex items-center justify-center bg-gray-100 rounded-lg">
+      <div className="text-center">
+        <MapPin className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+        <p className="text-gray-500">Loading map...</p>
+      </div>
+    </div>
+  ),
+})
+
 export default function DeviceDetailPage() {
   const params = useParams()
   const router = useRouter()
   const [device, setDevice] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("overview")
+  const [showMap, setShowMap] = useState(false)
 
   useEffect(() => {
     // In a real app, you would fetch the device data from an API
@@ -197,22 +123,29 @@ export default function DeviceDetailPage() {
     }
 
     setLoading(false)
+
+    // Delay showing the map to avoid React reconciliation issues
+    const timer = setTimeout(() => {
+      setShowMap(true)
+    }, 1000)
+
+    return () => clearTimeout(timer)
   }, [params.id])
 
   // Function to get battery icon based on percentage
-  const getBatteryIcon = (batteryStr: string) => {
+  const getBatteryIcon = useCallback((batteryStr: string) => {
     const percentage = Number.parseInt(batteryStr.replace("%", ""))
     if (percentage >= 70) return <BatteryCharging className="h-6 w-6 text-green-500" />
     if (percentage >= 30) return <Battery className="h-6 w-6 text-yellow-500" />
     return <BatteryLow className="h-6 w-6 text-red-500" />
-  }
+  }, [])
 
   // Function to get status icon
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = useCallback((status: string) => {
     if (status === "active") return <Wifi className="h-5 w-5 text-green-500" />
     if (status === "warning") return <AlertTriangle className="h-5 w-5 text-yellow-500" />
     return <WifiOff className="h-5 w-5 text-red-500" />
-  }
+  }, [])
 
   if (loading) {
     return (
@@ -299,7 +232,16 @@ export default function DeviceDetailPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="h-[300px] w-full">
-              <DeviceMap devices={[device]} selectedDeviceId={device.id} />
+              {showMap ? (
+                <DeviceMap devices={[device]} selectedDeviceId={device.id} />
+              ) : (
+                <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                  <div className="text-center">
+                    <MapPin className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500">Loading map...</p>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
           <CardFooter className="bg-gray-50 border-t p-4 text-sm text-muted-foreground">
@@ -379,7 +321,7 @@ export default function DeviceDetailPage() {
         </Card>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full" onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid grid-cols-4 mb-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="historical">Historical Data</TabsTrigger>
