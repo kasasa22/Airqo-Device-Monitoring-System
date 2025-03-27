@@ -5,7 +5,7 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-#
+
 #   http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
@@ -16,29 +16,7 @@
 # under the License.
 #
 
-# Basic Airflow cluster configuration for CeleryExecutor with Redis and PostgreSQL.
-#
-# WARNING: This configuration is for local development. Do not use it in a production deployment.
-#
-# This configuration supports basic configuration using environment variables or an .env file
-# The following variables are supported:
-#
-# AIRFLOW_IMAGE_NAME           - Docker image name used to run Airflow.
-#                                Default: apache/airflow:2.5.1
-# AIRFLOW_UID                  - User ID in Airflow containers
-#                                Default: 50000
-# AIRFLOW_PROJ_DIR             - Base path to which all the files will be volumed.
-#                                Default: .
-# Those configurations are useful mostly in case of standalone testing/running Airflow in test/try-out mode
-#
-# _AIRFLOW_WWW_USER_USERNAME   - Username for the administrator account (if requested).
-#                                Default: airflow
-# _AIRFLOW_WWW_USER_PASSWORD   - Password for the administrator account (if requested).
-#                                Default: airflow
-# _PIP_ADDITIONAL_REQUIREMENTS - Additional PIP requirements to add when starting all containers.
-#                                Default: ''
-#
-# Feel free to modify this file to suit your needs.
+# Docker Compose configuration for AirQo Data Pipeline with Airflow and PostgreSQL
 ---
 version: '3'
 x-airflow-common:
@@ -82,6 +60,9 @@ services:
       POSTGRES_DB: airflow
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 5s
@@ -276,5 +257,50 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+  # DBT service for data transformations
+  dbt:
+    image: ghcr.io/dbt-labs/dbt-postgres:1.5.0
+    volumes:
+      - ./dbt:/usr/app
+    working_dir: /usr/app
+    environment:
+      - DBT_PROFILES_DIR=/usr/app/profiles
+    depends_on:
+      - postgres
+    profiles:
+      - analytics
+    entrypoint: bash
+    command: -c "sleep infinity"
+
+  # FastAPI service for serving data
+  fastapi:
+    build: ./fastapi
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./fastapi:/app
+    environment:
+      - DATABASE_URL=postgresql://airflow:airflow@postgres:5432/airflow
+    depends_on:
+      - postgres
+    profiles:
+      - api
+    command: uvicorn app.main:app --host 0.0.0.0 --reload
+
+  # Next.js frontend
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+    environment:
+      - API_URL=http://fastapi:8000
+    depends_on:
+      - fastapi
+    profiles:
+      - ui
+    command: npm run dev
+    
 volumes:
   postgres-db-volume:
