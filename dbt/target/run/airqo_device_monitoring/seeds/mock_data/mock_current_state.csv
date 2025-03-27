@@ -1,0 +1,12 @@
+
+    
+    
+    truncate table "airflow"."public_raw"."mock_current_state";
+    -- dbt seed --
+    
+          insert into "airflow"."public_raw"."mock_current_state" ("status_id", "device_id", "battery_voltage", "signal_strength_dbm", "internal_temperature", "memory_usage", "error_code", "status_timestamp", "created_at", "updated_at") values
+          (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s),(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s),(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s),(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s),(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+      
+
+;
+  

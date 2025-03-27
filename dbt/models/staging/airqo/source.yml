@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "Raw data from AirQo sensors"
+    schema: analytics
+    tables:
+      - name: devices
+        description: "Devices table containing basic device information"
+      - name: current_state
+        description: "Current operational state of devices"
+      - name: device_readings
+        description: "Readings from devices"

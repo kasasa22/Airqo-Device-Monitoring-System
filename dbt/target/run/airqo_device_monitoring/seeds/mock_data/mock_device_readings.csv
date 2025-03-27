@@ -1,0 +1,12 @@
+
+    
+    
+    truncate table "airflow"."public_raw"."mock_device_readings";
+    -- dbt seed --
+    
+          insert into "airflow"."public_raw"."mock_device_readings" ("reading_id", "device_id", "timestamp", "temperature", "humidity", "pm2_5", "pm10", "validation_status", "reading_quality", "created_at", "updated_at") values
+          (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s),(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s),(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s),(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s),(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s),(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s),(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s),(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s),(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s),(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+      
+
+;
+  
