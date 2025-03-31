@@ -5,7 +5,7 @@ import type React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useState } from "react"
-import { BarChart3, MapPin, Bell, Settings, Menu, X, Home, Users, FileText, LogOut } from "lucide-react"
+import { BarChart3, MapPin, Bell, Settings, Menu, X, Home, Users, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 // Update the imports to include useRouter
@@ -80,15 +80,6 @@ export default function DashboardLayout({
               <Link href="/dashboard/users" className="flex items-center p-2 rounded-md hover:bg-primary-foreground/10">
                 <Users className="h-5 w-5" />
                 {sidebarOpen && <span className="ml-3">Users</span>}
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/dashboard/reports"
-                className="flex items-center p-2 rounded-md hover:bg-primary-foreground/10"
-              >
-                <FileText className="h-5 w-5" />
-                {sidebarOpen && <span className="ml-3">Reports</span>}
               </Link>
             </li>
             <li>
