@@ -36,6 +36,8 @@ const sampleDevices = [
     battery: "85%",
     pm25: 28,
     pm10: 52,
+    dataCompleteness: "98%",
+    lastMissing: null,
   },
   {
     id: "KLA002",
@@ -47,6 +49,8 @@ const sampleDevices = [
     battery: "92%",
     pm25: 32,
     pm10: 58,
+    dataCompleteness: "71%",
+    lastMissing: "2 days ago",
   },
   // More devices...
   // Include just a few more for the example
@@ -60,6 +64,8 @@ const sampleDevices = [
     battery: "78%",
     pm25: 24,
     pm10: 45,
+    dataCompleteness: "85%",
+    lastMissing: "5 days ago",
   },
   {
     id: "LAG001",
@@ -71,6 +77,8 @@ const sampleDevices = [
     battery: "75%",
     pm25: 48,
     pm10: 85,
+    dataCompleteness: "100%",
+    lastMissing: null,
   },
   {
     id: "CAI001",
@@ -82,6 +90,8 @@ const sampleDevices = [
     battery: "95%",
     pm25: 52,
     pm10: 95,
+    dataCompleteness: "92%",
+    lastMissing: "1 week ago",
   },
 ]
 
@@ -294,6 +304,7 @@ export default function DevicesPage() {
                   <th className="text-left py-3 px-4 font-medium text-gray-600">Battery</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">PM2.5</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">PM10</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-600">Data Completeness</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
                 </tr>
               </thead>
@@ -362,6 +373,25 @@ export default function DevicesPage() {
                       ) : (
                         "-"
                       )}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex flex-col">
+                        <div className="flex items-center">
+                          <div
+                            className={`h-2 w-2 rounded-full mr-2 ${
+                              Number.parseInt(device.dataCompleteness) >= 95
+                                ? "bg-green-500"
+                                : Number.parseInt(device.dataCompleteness) >= 80
+                                  ? "bg-yellow-500"
+                                  : "bg-red-500"
+                            }`}
+                          ></div>
+                          {device.dataCompleteness}
+                        </div>
+                        {device.lastMissing && (
+                          <span className="text-xs text-gray-500 mt-1">Last missing: {device.lastMissing}</span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3 px-4">
                       <Link
