@@ -68,6 +68,19 @@ services:
       interval: 5s
       retries: 5
     restart: always
+  
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadminana
+    environment:
+      PGADMIN_DEFAULT_EMAIL: kasasatrevor25@gmail.com  # Change this to your email
+      PGADMIN_DEFAULT_PASSWORD: Admin@2001  # Change this password
+    ports:
+      - "5050:80"  # Access pgAdmin at http://localhost:5050
+    depends_on:
+      - postgres
+    restart: always
+
 
   redis:
     image: redis:latest
