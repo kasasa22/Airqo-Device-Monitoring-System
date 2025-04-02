@@ -18,14 +18,10 @@
 
 # Docker Compose configuration for AirQo Data Pipeline with Airflow and PostgreSQL
 ---
-version: '3'
 x-airflow-common:
   &airflow-common
-  # In order to add custom dependencies or upgrade provider packages you can use your extended image.
-  # Comment the image line, place your Dockerfile in the directory where you placed the docker-compose.yaml
-  # and uncomment the "build" line below, Then run `docker-compose build` to build the images.
-  image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.5.1}
-  # build: .
+  # Replacing the image with a build directive to use our custom Dockerfile
+  build: .
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
@@ -43,6 +39,7 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+    - ${AIRFLOW_PROJ_DIR:-.}/dbt:/opt/airflow/dbt
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -73,14 +70,13 @@ services:
     image: dpage/pgadmin4
     container_name: pgadminana
     environment:
-      PGADMIN_DEFAULT_EMAIL: kasasatrevor25@gmail.com  # Change this to your email
-      PGADMIN_DEFAULT_PASSWORD: Admin@2001  # Change this password
+      PGADMIN_DEFAULT_EMAIL: kasasatrevor25@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: Admin@2001
     ports:
       - "5050:80"  # Access pgAdmin at http://localhost:5050
     depends_on:
       - postgres
     restart: always
-
 
   redis:
     image: redis:latest
