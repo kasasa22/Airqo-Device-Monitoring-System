@@ -1,4 +1,6 @@
+# dbt/profiles/profiles.yml
 airqo:
+  target: dev
   outputs:
     dev:
       type: postgres
@@ -9,4 +11,3 @@ airqo:
       dbname: airflow
       schema: public
       threads: 4
-  target: dev
