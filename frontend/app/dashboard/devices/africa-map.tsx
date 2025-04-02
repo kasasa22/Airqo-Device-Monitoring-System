@@ -160,87 +160,77 @@ export default function AfricaMap({ devices = [], onDeviceSelect, selectedDevice
 
       // Add Africa outline GeoJSON for better visualization
       if (!geoJsonLayerRef.current) {
-        fetch("https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json")
-          .then((response) => response.json())
+        // Use a more reliable source or provide a local fallback
+        // Try to use fetch with error handling
+        fetch("/api/africa-geojson")
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error(`Failed to fetch Africa GeoJSON: ${response.status}`)
+            }
+            return response.json()
+          })
           .then((data) => {
             if (!mapInstanceRef.current) return
-
-            const africaCountries = data.features.filter((feature: any) => {
-              const africanCountries = [
-                "DZA",
-                "AGO",
-                "BEN",
-                "BWA",
-                "BFA",
-                "BDI",
-                "CMR",
-                "CPV",
-                "CAF",
-                "TCD",
-                "COM",
-                "COG",
-                "COD",
-                "DJI",
-                "EGY",
-                "GNQ",
-                "ERI",
-                "ETH",
-                "GAB",
-                "GMB",
-                "GHA",
-                "GIN",
-                "GNB",
-                "CIV",
-                "KEN",
-                "LSO",
-                "LBR",
-                "LBY",
-                "MDG",
-                "MWI",
-                "MLI",
-                "MRT",
-                "MUS",
-                "MAR",
-                "MOZ",
-                "NAM",
-                "NER",
-                "NGA",
-                "RWA",
-                "STP",
-                "SEN",
-                "SYC",
-                "SLE",
-                "SOM",
-                "ZAF",
-                "SSD",
-                "SDN",
-                "SWZ",
-                "TZA",
-                "TGO",
-                "TUN",
-                "UGA",
-                "ZMB",
-                "ZWE",
-              ]
-              return africanCountries.includes(feature.properties.iso_a3)
-            })
-
-            geoJsonLayerRef.current = L.geoJSON(
-              { type: "FeatureCollection", features: africaCountries },
-              {
-                style: {
-                  color: "#666",
-                  weight: 1,
-                  fillColor: "#f8f8f8",
-                  fillOpacity: 0.1,
-                },
-              },
-            ).addTo(mapInstanceRef.current)
+            addAfricaOutline(data)
           })
-          .catch((error) => console.error("Error loading GeoJSON:", error))
+          .catch((error) => {
+            console.warn("Error loading Africa GeoJSON from API:", error)
+            // Fallback: Just draw a simple polygon representing Africa
+            drawSimpleAfricaOutline()
+          })
       }
     } catch (error) {
       console.error("Error updating map markers:", error)
+    }
+
+    function addAfricaOutline(data: any) {
+      if (!mapInstanceRef.current) return
+      
+      // Filter for African countries if data contains worldwide countries
+      const africaCountries = data.features.filter((feature: any) => {
+        const africanCountries = [
+          "DZA", "AGO", "BEN", "BWA", "BFA", "BDI", "CMR", "CPV", "CAF", "TCD",
+          "COM", "COG", "COD", "DJI", "EGY", "GNQ", "ERI", "ETH", "GAB", "GMB",
+          "GHA", "GIN", "GNB", "CIV", "KEN", "LSO", "LBR", "LBY", "MDG", "MWI",
+          "MLI", "MRT", "MUS", "MAR", "MOZ", "NAM", "NER", "NGA", "RWA", "STP",
+          "SEN", "SYC", "SLE", "SOM", "ZAF", "SSD", "SDN", "SWZ", "TZA", "TGO",
+          "TUN", "UGA", "ZMB", "ZWE"
+        ]
+        return africanCountries.includes(feature.properties.iso_a3)
+      })
+
+      geoJsonLayerRef.current = L.geoJSON(
+        { type: "FeatureCollection", features: africaCountries },
+        {
+          style: {
+            color: "#666",
+            weight: 1,
+            fillColor: "#f8f8f8",
+            fillOpacity: 0.1,
+          },
+        }
+      ).addTo(mapInstanceRef.current)
+    }
+
+    function drawSimpleAfricaOutline() {
+      if (!mapInstanceRef.current) return
+
+      // Simplified polygon coordinates representing Africa's rough outline
+      const africaCoords = [
+        [37, -4], [40, 15], [23, 32], [12, 30], [-10, 28], 
+        [-18, 15], [-16, -16], [20, -36], [38, -30], [42, -10], [37, -4]
+      ]
+
+      // Create a polygon and add it to the map
+      const africaPolygon = L.polygon(africaCoords.map(coord => [coord[1], coord[0]]), {
+        color: "#666",
+        weight: 1,
+        fillColor: "#f8f8f8",
+        fillOpacity: 0.1
+      }).addTo(mapInstanceRef.current)
+
+      geoJsonLayerRef.current = L.geoJSON() // Create an empty GeoJSON layer as a placeholder
+      mapInstanceRef.current.addLayer(geoJsonLayerRef.current)
     }
 
     // Cleanup function
@@ -268,4 +258,3 @@ export default function AfricaMap({ devices = [], onDeviceSelect, selectedDevice
 
   return <div ref={mapRef} className="h-full w-full" />
 }
-
