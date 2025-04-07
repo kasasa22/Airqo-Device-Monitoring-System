@@ -294,19 +294,16 @@ services:
 
   # FastAPI service for serving data
   fastapi:
-    build: ./fastapi
+    build: ./backend/api
     ports:
       - "8000:8000"
     volumes:
-      - ./fastapi:/app
+      - ./backend/api:/app  # Updated path to match your project structure
     environment:
       - DATABASE_URL=postgresql://airflow:airflow@postgres:5432/airflow
     depends_on:
       - postgres
-    profiles:
-      - api
-    command: uvicorn app.main:app --host 0.0.0.0 --reload
-
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
   # Next.js frontend
   frontend:
     build: ./frontend

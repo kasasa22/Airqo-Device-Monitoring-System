@@ -1,8 +1,10 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   AlertCircle,
   AlertTriangle,
@@ -23,6 +25,8 @@ import {
   BarChart,
   PieChart,
   Battery,
+  Package,
+  AlertOctagon,
 } from "lucide-react"
 import {
   LineChart,
@@ -41,7 +45,6 @@ import {
 } from "recharts"
 import Link from "next/link"
 import dynamic from "next/dynamic"
-import { Button } from "@/components/ui/button"
 
 // Dynamically import the map component
 const AfricaMap = dynamic(() => import("./devices/africa-map"), {
@@ -114,16 +117,82 @@ const sampleDevices = [
 ]
 
 export default function DashboardPage() {
+  // State for device counts
+  const [deviceCounts, setDeviceCounts] = useState({
+    total_devices: 0,
+    active_devices: 0,
+    offline_devices: 0,
+    deployed_devices: 0,
+    not_deployed: 0,
+    recalled_devices: 0
+  });
+  
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Define the fetch function
+  const fetchDeviceCounts = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:8000/device-counts');
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setDeviceCounts(data);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching device counts:", err);
+      setError("Failed to load device data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Call it on component mount
+  useEffect(() => {
+    fetchDeviceCounts();
+  }, []);
+
+  // Calculate percentages for the progress bars
+  const calculatePercentage = (value) => {
+    return deviceCounts.total_devices > 0 
+      ? Math.round((value / deviceCounts.total_devices) * 100) 
+      : 0;
+  };
+
+  const activePercentage = calculatePercentage(deviceCounts.active_devices);
+  const offlinePercentage = calculatePercentage(deviceCounts.offline_devices);
+  const deployedPercentage = calculatePercentage(deviceCounts.deployed_devices);
+  const notDeployedPercentage = calculatePercentage(deviceCounts.not_deployed);
+  const recalledPercentage = calculatePercentage(deviceCounts.recalled_devices);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Device Performance Dashboard</h1>
-        <Button variant="outline" size="sm" className="flex items-center">
-          <RefreshCw className="mr-2 h-4 w-4" /> Refresh Data
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="flex items-center"
+          onClick={() => fetchDeviceCounts()}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> 
+          {loading ? 'Loading...' : 'Refresh Data'}
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="overflow-hidden border-l-4 border-l-primary hover:shadow-md transition-shadow">
           <CardHeader className="pb-2 bg-gradient-to-r from-primary/10 to-transparent">
             <CardTitle className="text-sm font-medium flex items-center">
@@ -132,7 +201,9 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            <div className="text-3xl font-bold">100</div>
+            <div className="text-3xl font-bold">
+              {loading ? '...' : deviceCounts.total_devices}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">Devices deployed across Africa</p>
           </CardContent>
         </Card>
@@ -145,26 +216,12 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            <div className="text-3xl font-bold">68</div>
-            <div className="flex items-center mt-1">
-              <div className="h-2 bg-green-500 rounded-full" style={{ width: "68%" }}></div>
-              <span className="text-xs text-muted-foreground ml-2">68%</span>
+            <div className="text-3xl font-bold">
+              {loading ? '...' : deviceCounts.active_devices}
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-l-4 border-l-yellow-500 hover:shadow-md transition-shadow">
-          <CardHeader className="pb-2 bg-gradient-to-r from-yellow-500/10 to-transparent">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <Settings className="mr-2 h-5 w-5 text-yellow-500" />
-              Maintenance
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="text-3xl font-bold">15</div>
             <div className="flex items-center mt-1">
-              <div className="h-2 bg-yellow-500 rounded-full" style={{ width: "15%" }}></div>
-              <span className="text-xs text-muted-foreground ml-2">15%</span>
+              <div className="h-2 bg-green-500 rounded-full" style={{ width: `${activePercentage}%` }}></div>
+              <span className="text-xs text-muted-foreground ml-2">{activePercentage}%</span>
             </div>
           </CardContent>
         </Card>
@@ -177,10 +234,68 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            <div className="text-3xl font-bold">17</div>
+            <div className="text-3xl font-bold">
+              {loading ? '...' : deviceCounts.offline_devices}
+            </div>
             <div className="flex items-center mt-1">
-              <div className="h-2 bg-red-500 rounded-full" style={{ width: "17%" }}></div>
-              <span className="text-xs text-muted-foreground ml-2">17%</span>
+              <div className="h-2 bg-red-500 rounded-full" style={{ width: `${offlinePercentage}%` }}></div>
+              <span className="text-xs text-muted-foreground ml-2">{offlinePercentage}%</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
+          <CardHeader className="pb-2 bg-gradient-to-r from-blue-500/10 to-transparent">
+            <CardTitle className="text-sm font-medium flex items-center">
+              <MapPin className="mr-2 h-5 w-5 text-blue-500" />
+              Deployed Devices
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="text-3xl font-bold">
+              {loading ? '...' : deviceCounts.deployed_devices}
+            </div>
+            <div className="flex items-center mt-1">
+              <div className="h-2 bg-blue-500 rounded-full" style={{ width: `${deployedPercentage}%` }}></div>
+              <span className="text-xs text-muted-foreground ml-2">{deployedPercentage}%</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="overflow-hidden border-l-4 border-l-amber-500 hover:shadow-md transition-shadow">
+          <CardHeader className="pb-2 bg-gradient-to-r from-amber-500/10 to-transparent">
+            <CardTitle className="text-sm font-medium flex items-center">
+              <Package className="mr-2 h-5 w-5 text-amber-500" />
+              Not Deployed
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="text-3xl font-bold">
+              {loading ? '...' : deviceCounts.not_deployed}
+            </div>
+            <div className="flex items-center mt-1">
+              <div className="h-2 bg-amber-500 rounded-full" style={{ width: `${notDeployedPercentage}%` }}></div>
+              <span className="text-xs text-muted-foreground ml-2">{notDeployedPercentage}%</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-l-4 border-l-purple-500 hover:shadow-md transition-shadow">
+          <CardHeader className="pb-2 bg-gradient-to-r from-purple-500/10 to-transparent">
+            <CardTitle className="text-sm font-medium flex items-center">
+              <AlertOctagon className="mr-2 h-5 w-5 text-purple-500" />
+              Recalled Devices
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="text-3xl font-bold">
+              {loading ? '...' : deviceCounts.recalled_devices}
+            </div>
+            <div className="flex items-center mt-1">
+              <div className="h-2 bg-purple-500 rounded-full" style={{ width: `${recalledPercentage}%` }}></div>
+              <span className="text-xs text-muted-foreground ml-2">{recalledPercentage}%</span>
             </div>
           </CardContent>
         </Card>

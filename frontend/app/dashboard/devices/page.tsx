@@ -19,6 +19,8 @@ import {
   BatteryCharging,
   BatteryLow,
   ArrowRight,
+  Package,
+  AlertOctagon,
 } from "lucide-react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
@@ -161,7 +163,7 @@ export default function DevicesPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="overflow-hidden border-l-4 border-l-primary hover:shadow-md transition-shadow">
           <CardHeader className="pb-2 bg-gradient-to-r from-primary/10 to-transparent">
             <CardTitle className="text-sm font-medium flex items-center">
@@ -213,6 +215,56 @@ export default function DevicesPage() {
               <span className="text-xs text-muted-foreground ml-2">
                 {Math.round((offlineDevices / sampleDevices.length) * 100)}%
               </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
+          <CardHeader className="pb-2 bg-gradient-to-r from-blue-500/10 to-transparent">
+            <CardTitle className="text-sm font-medium flex items-center">
+              <MapPin className="mr-2 h-5 w-5 text-blue-500" />
+              Deployed Devices
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="text-3xl font-bold">{Math.round(sampleDevices.length * 0.85)}</div>
+            <div className="flex items-center mt-1">
+              <div className="h-2 bg-blue-500 rounded-full" style={{ width: "85%" }}></div>
+              <span className="text-xs text-muted-foreground ml-2">85%</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="overflow-hidden border-l-4 border-l-amber-500 hover:shadow-md transition-shadow">
+          <CardHeader className="pb-2 bg-gradient-to-r from-amber-500/10 to-transparent">
+            <CardTitle className="text-sm font-medium flex items-center">
+              <Package className="mr-2 h-5 w-5 text-amber-500" />
+              Not Deployed
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="text-3xl font-bold">{Math.round(sampleDevices.length * 0.1)}</div>
+            <div className="flex items-center mt-1">
+              <div className="h-2 bg-amber-500 rounded-full" style={{ width: "10%" }}></div>
+              <span className="text-xs text-muted-foreground ml-2">10%</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-l-4 border-l-purple-500 hover:shadow-md transition-shadow">
+          <CardHeader className="pb-2 bg-gradient-to-r from-purple-500/10 to-transparent">
+            <CardTitle className="text-sm font-medium flex items-center">
+              <AlertOctagon className="mr-2 h-5 w-5 text-purple-500" />
+              Recalled Devices
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="text-3xl font-bold">{Math.round(sampleDevices.length * 0.05)}</div>
+            <div className="flex items-center mt-1">
+              <div className="h-2 bg-purple-500 rounded-full" style={{ width: "5%" }}></div>
+              <span className="text-xs text-muted-foreground ml-2">5%</span>
             </div>
           </CardContent>
         </Card>
