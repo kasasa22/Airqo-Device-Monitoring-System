@@ -1,11 +1,12 @@
+# schemas.py
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
 
 class UserBase(BaseModel):
     email: EmailStr
-    first_name: str  # Change from firstname to first_name
-    last_name: str  # Change from lastname to last_name
+    first_name: str
+    last_name: str
     role: str
     status: str = "pending"
     phone: Optional[str] = None
@@ -31,3 +32,7 @@ class User(UserBase):
 
     class Config:
         orm_mode = True
+
+# New schema for checking if a user exists
+class UserCheck(BaseModel):
+    email: EmailStr
