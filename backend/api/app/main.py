@@ -490,33 +490,49 @@ def get_devices_simple(db=Depends(get_db)):
     except Exception as e:
         print(f"Error in simple devices endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch simple devices: {str(e)}")
-
 @app.get("/valid-device-locations")
 def get_valid_device_locations(db=Depends(get_db)):
     try:
-        # Query that joins dim_device and dim_location tables, filtering for active and deployed devices with valid coordinates
+        # Query that joins dim_device, dim_location, and latest readings with site information
         result = db.execute(text("""
+            WITH latest_readings AS (
+                SELECT DISTINCT ON (device_key) 
+                    device_key,
+                    site_key,
+                    timestamp,
+                    pm2_5,
+                    pm10
+                FROM fact_device_readings
+                ORDER BY device_key, timestamp DESC
+            )
             SELECT 
                 d.device_id,
                 d.device_name,
                 d.status,
                 d.is_online,
-                l.location_key,
-                l.device_key,
                 l.latitude,
                 l.longitude,
-                l.location_name,
-                l.search_name,
-                l.village,
                 l.admin_level_country,
                 l.admin_level_city,
                 l.admin_level_division,
-                l.site_category,
-                l.site_name,
-                l.deployment_date,
-                l.is_active
+                s.site_id,
+                s.site_name,
+                s.location_name,
+                s.search_name,
+                s.village,
+                s.town,
+                s.city,
+                s.district,
+                s.country,
+                s.data_provider,
+                s.site_category,
+                r.pm2_5,
+                r.pm10,
+                r.timestamp as reading_timestamp
             FROM dim_device d
             INNER JOIN dim_location l ON d.device_key = l.device_key
+            LEFT JOIN latest_readings r ON d.device_key = r.device_key
+            LEFT JOIN dim_site s ON r.site_key = s.site_key
             WHERE 
                 l.latitude IS NOT NULL 
                 AND l.longitude IS NOT NULL
@@ -537,7 +553,31 @@ def get_valid_device_locations(db=Depends(get_db)):
                 
                 # Convert datetime and decimal objects
                 location_dict = convert_to_json_serializable(location_dict)
-                device_locations.append(location_dict)
+                
+                # Format the response structure
+                formatted_location = {
+                    "id": location_dict["device_id"],
+                    "name": location_dict["device_name"],
+                    "status": "ACTIVE" if location_dict["status"] == "deployed" and location_dict["is_online"] else "INACTIVE",
+                    "latitude": location_dict["latitude"],
+                    "longitude": location_dict["longitude"],
+                    "pm2_5": location_dict.get("pm2_5"),
+                    "pm10": location_dict.get("pm10"),
+                    "reading_timestamp": location_dict.get("reading_timestamp"),
+                    "location": {
+                        "name": location_dict.get("location_name") or location_dict.get("admin_level_division") or location_dict.get("city"),
+                        "admin_level_country": location_dict.get("admin_level_country") or location_dict.get("country"),
+                        "admin_level_city": location_dict.get("admin_level_city") or location_dict.get("city"),
+                        "admin_level_division": location_dict.get("admin_level_division"),
+                        "village": location_dict.get("village"),
+                        "site_name": location_dict.get("site_name"),
+                        "site_category": location_dict.get("site_category"),
+                        "site_id": location_dict.get("site_id"),
+                        "data_provider": location_dict.get("data_provider")
+                    }
+                }
+                
+                device_locations.append(formatted_location)
                 
             except Exception as row_error:
                 print(f"Error processing location row: {str(row_error)}")
