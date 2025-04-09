@@ -7,14 +7,18 @@ import "leaflet/dist/leaflet.css"
 
 interface Device {
   id: string
-  name: string
+  name?: string
   status: string
-  lat: number
-  lng: number
+  lat?: number
+  lng?: number
+  latitude?: number
+  longitude?: number
   lastUpdate?: string
   pm25?: number
   pm10?: number
-  location?: string
+  pm2_5?: number
+  reading_timestamp?: string
+  location?: any
 }
 
 interface AfricaMapProps {
@@ -32,6 +36,7 @@ export default function AfricaMap({ devices = [], onDeviceSelect, selectedDevice
   const hasInitializedRef = useRef(false)
   const [apiDevices, setApiDevices] = useState<Device[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [mapError, setMapError] = useState<string | null>(null)
 
   // Fetch real device data when component mounts if no devices are provided
   useEffect(() => {
@@ -71,6 +76,7 @@ export default function AfricaMap({ devices = [], onDeviceSelect, selectedDevice
       setApiDevices(transformedDevices)
     } catch (error) {
       console.error("Error fetching device data:", error)
+      setMapError("Failed to load device data")
     } finally {
       setIsLoading(false)
     }
@@ -79,9 +85,37 @@ export default function AfricaMap({ devices = [], onDeviceSelect, selectedDevice
   // Use provided devices if available, otherwise use fetched API devices
   const displayDevices = devices.length > 0 ? devices : apiDevices
   
+  // Normalize device data to ensure lat/lng fields
+  const normalizedDevices = displayDevices.map(device => {
+    // Check if we need to use latitude/longitude fields instead of lat/lng
+    const lat = device.lat !== undefined ? device.lat : 
+                device.latitude !== undefined ? parseFloat(device.latitude as any) : undefined
+    const lng = device.lng !== undefined ? device.lng : 
+                device.longitude !== undefined ? parseFloat(device.longitude as any) : undefined
+    
+    // Return normalized device
+    return {
+      ...device,
+      lat,
+      lng,
+      // Normalize other fields
+      name: device.name || "Unnamed Device",
+      pm25: device.pm25 || device.pm2_5,
+      lastUpdate: device.lastUpdate || (device.reading_timestamp ? new Date(device.reading_timestamp).toLocaleString() : "Unknown"),
+    }
+  }).filter(device => {
+    // Filter out devices with invalid coordinates
+    return device.lat !== undefined && 
+           device.lng !== undefined && 
+           !isNaN(device.lat) && 
+           !isNaN(device.lng)
+  })
+
   // Define createCustomIcon outside useEffect to avoid recreating it on every render
   const createCustomIcon = useCallback((status: string, isSelected = false) => {
-    const markerColor = status === "active" ? "#4CAF50" : status === "warning" ? "#FFC107" : "#F44336"
+    const markerColor = status === "active" || status === "ACTIVE" ? "#4CAF50" : 
+                         status === "warning" ? "#FFC107" : 
+                         "#F44336"
     const size = isSelected ? 30 : 20
     const borderWidth = isSelected ? 3 : 2
 
@@ -111,8 +145,8 @@ export default function AfricaMap({ devices = [], onDeviceSelect, selectedDevice
           shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
         })
 
-        // Create map centered on Uganda initially
-        const map = L.map(mapRef.current).setView([0.3476, 32.5825], 7)
+        // Create map centered on Africa
+        const map = L.map(mapRef.current).setView([0, 20], 3)
 
         // Add OpenStreetMap tiles
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -124,6 +158,7 @@ export default function AfricaMap({ devices = [], onDeviceSelect, selectedDevice
         console.log("Map initialized successfully")
       } catch (error) {
         console.error("Error initializing map:", error)
+        setMapError("Failed to initialize map")
         return
       }
     }
@@ -138,17 +173,16 @@ export default function AfricaMap({ devices = [], onDeviceSelect, selectedDevice
     markersRef.current = []
 
     // Add markers for each device
-    if (displayDevices.length > 0) {
-      console.log("Adding", displayDevices.length, "markers to map")
+    if (normalizedDevices.length > 0) {
+      console.log("Adding", normalizedDevices.length, "markers to map")
       
       try {
-        // Create a bounds object directly from device coordinates
-        const latLngs = displayDevices.map((device) => L.latLng(device.lat, device.lng))
-        const bounds = L.latLngBounds(latLngs)
+        // Create an array to store valid LatLng points
+        const validLatLngs: L.LatLng[] = []
         
         // Add markers
-        displayDevices.forEach((device) => {
-          if (isNaN(device.lat) || isNaN(device.lng)) {
+        normalizedDevices.forEach((device) => {
+          if (device.lat === undefined || device.lng === undefined || isNaN(device.lat) || isNaN(device.lng)) {
             console.warn(`Invalid coordinates for device ${device.id}:`, device.lat, device.lng)
             return
           }
@@ -156,71 +190,98 @@ export default function AfricaMap({ devices = [], onDeviceSelect, selectedDevice
           const isSelected = device.id === selectedDeviceId
           const icon = createCustomIcon(device.status, isSelected)
 
-          const marker = L.marker([device.lat, device.lng], {
-            icon: icon,
-          }).addTo(mapInstanceRef.current!)
+          try {
+            const marker = L.marker([device.lat, device.lng], {
+              icon: icon,
+            }).addTo(mapInstanceRef.current!)
 
-          // Store marker for cleanup
-          markersRef.current.push(marker)
+            // Add the LatLng to our array of valid points
+            validLatLngs.push(L.latLng(device.lat, device.lng))
 
-          // Add popup with device info
-          marker.bindPopup(`
-            <div style="min-width: 200px;">
-              <h3 style="margin: 0 0 5px; font-weight: bold;">${device.name}</h3>
-              <p style="margin: 0 0 5px;">ID: ${device.id}</p>
-              <p style="margin: 0 0 5px;">Status: 
-                <span style="color: ${
-                  device.status === "active" ? "#4CAF50" : device.status === "warning" ? "#FFC107" : "#F44336"
-                }; font-weight: bold;">
-                  ${device.status.toUpperCase()}
-                </span>
-              </p>
-              ${device.location ? `<p style="margin: 0 0 5px;">Location: ${device.location}</p>` : ""}
-              ${device.lastUpdate ? `<p style="margin: 0 0 5px;">Last Update: ${device.lastUpdate}</p>` : ""}
-              ${
-                device.status !== "offline"
-                  ? `
-                <p style="margin: 0 0 5px;">PM2.5: ${device.pm25} µg/m³</p>
-                <p style="margin: 0 0 5px;">PM10: ${device.pm10} µg/m³</p>
-              `
-                  : ""
-              }
-              <div style="margin-top: 10px; text-align: center;">
-                <a href="/dashboard/devices/${device.id}" style="display: inline-block; padding: 5px 10px; background-color: #2563EB; color: white; text-decoration: none; border-radius: 4px; font-size: 12px;">View Details</a>
+            // Store marker for cleanup
+            markersRef.current.push(marker)
+
+            // Add popup with device info
+            marker.bindPopup(`
+              <div style="min-width: 200px;">
+                <h3 style="margin: 0 0 5px; font-weight: bold;">${device.name}</h3>
+                <p style="margin: 0 0 5px;">ID: ${device.id}</p>
+                <p style="margin: 0 0 5px;">Status: 
+                  <span style="color: ${
+                    device.status === "active" || device.status === "ACTIVE" ? "#4CAF50" : 
+                    device.status === "warning" ? "#FFC107" : 
+                    "#F44336"
+                  }; font-weight: bold;">
+                    ${(device.status || "unknown").toUpperCase()}
+                  </span>
+                </p>
+                ${device.location?.name ? `<p style="margin: 0 0 5px;">Location: ${device.location.name}</p>` : ""}
+                ${device.lastUpdate ? `<p style="margin: 0 0 5px;">Last Update: ${device.lastUpdate}</p>` : ""}
+                ${
+                  device.status !== "offline" && device.status !== "INACTIVE"
+                    ? `
+                  <p style="margin: 0 0 5px;">PM2.5: ${device.pm25 !== undefined ? device.pm25 : 'N/A'} µg/m³</p>
+                  <p style="margin: 0 0 5px;">PM10: ${device.pm10 !== undefined ? device.pm10 : 'N/A'} µg/m³</p>
+                `
+                    : ""
+                }
+                <div style="margin-top: 10px; text-align: center;">
+                  <a href="/dashboard/devices/${device.id}" style="display: inline-block; padding: 5px 10px; background-color: #2563EB; color: white; text-decoration: none; border-radius: 4px; font-size: 12px;">View Details</a>
+                </div>
               </div>
-            </div>
-          `)
+            `)
 
-          // Make the marker clickable
-          marker.on("click", () => {
-            if (onDeviceSelect) {
-              onDeviceSelect(device.id)
+            // Make the marker clickable
+            marker.on("click", () => {
+              if (onDeviceSelect) {
+                onDeviceSelect(device.id)
+              }
+            })
+
+            // Add double click event to navigate to device detail page
+            marker.on("dblclick", () => {
+              router.push(`/dashboard/devices/${device.id}`)
+            })
+
+            // If this is the selected device, open its popup
+            if (isSelected) {
+              marker.openPopup()
             }
-          })
-
-          // Add double click event to navigate to device detail page
-          marker.on("dblclick", () => {
-            router.push(`/dashboard/devices/${device.id}`)
-          })
-
-          // If this is the selected device, open its popup
-          if (isSelected) {
-            marker.openPopup()
+          } catch (markerError) {
+            console.error(`Error creating marker for device ${device.id}:`, markerError)
           }
         })
 
-        // Fit the map to the bounds with some padding
-        mapInstanceRef.current.fitBounds(bounds, {
-          padding: [50, 50],
-          maxZoom: 6,
-        })
+        // Only attempt to fit bounds if we have valid points
+        if (validLatLngs.length > 0) {
+          try {
+            // Create a bounds object from valid LatLngs
+            const bounds = L.latLngBounds(validLatLngs)
+            
+            // Fit the map to the bounds with some padding
+            mapInstanceRef.current.fitBounds(bounds, {
+              padding: [50, 50],
+              maxZoom: 6,
+            })
+          } catch (boundsError) {
+            console.error("Error fitting bounds:", boundsError)
+            // If we can't fit bounds, at least center on Africa
+            mapInstanceRef.current.setView([0, 20], 3)
+          }
+        } else {
+          // If no valid points, center on Africa
+          mapInstanceRef.current.setView([0, 20], 3)
+        }
         
         console.log("Added", markersRef.current.length, "markers to map")
       } catch (error) {
         console.error("Error adding markers to map:", error)
+        setMapError("Error adding markers to map")
       }
     } else {
       console.log("No devices available to show on map")
+      // Center on Africa if no devices
+      mapInstanceRef.current.setView([0, 20], 3)
     }
 
     // Add Africa outline for context
@@ -248,7 +309,7 @@ export default function AfricaMap({ devices = [], onDeviceSelect, selectedDevice
       geoJsonLayerRef.current = L.geoJSON() // Empty GeoJSON layer as a placeholder
       mapInstanceRef.current.addLayer(geoJsonLayerRef.current)
     }
-  }, [displayDevices, selectedDeviceId, createCustomIcon, onDeviceSelect, router])
+  }, [normalizedDevices, selectedDeviceId, createCustomIcon, onDeviceSelect, router])
 
   // Add a refresh button to manually reload data if needed
   const handleRefresh = () => {
@@ -268,9 +329,17 @@ export default function AfricaMap({ devices = [], onDeviceSelect, selectedDevice
         </div>
       )}
       
+      {mapError && (
+        <div className="absolute top-2 left-2 bg-red-50 border border-red-200 rounded-md shadow-md px-3 py-2 z-[1000]">
+          <div className="flex items-center text-red-500">
+            <span className="text-xs">{mapError}</span>
+          </div>
+        </div>
+      )}
+      
       <div className="absolute bottom-2 right-2 bg-white rounded-md shadow-md px-2 py-1 z-[1000]">
         <div className="flex items-center">
-          <span className="text-xs mr-2">{displayDevices.length} devices</span>
+          <span className="text-xs mr-2">{normalizedDevices.length} valid device locations</span>
           <button 
             onClick={handleRefresh}
             className="text-xs bg-blue-500 text-white rounded px-2 py-0.5"
