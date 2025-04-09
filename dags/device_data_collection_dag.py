@@ -276,47 +276,126 @@ def load_device_metadata_to_postgres(**kwargs):
                     # Extract site information if available
                     site_id = None
                     site_name = None
+                    location_name = None
+                    search_name = None
+                    village = None
+                    site_category = None
+                    admin_level_country = None
+                    admin_level_city = None
+                    admin_level_division = None
                     
+                    # Extract site information
                     if 'site' in row and isinstance(row['site'], dict):
                         site_id = row['site'].get('_id')
                         site_name = row['site'].get('name')
+                        location_name = row['site'].get('location_name')
+                        search_name = row['site'].get('search_name')
+                        village = row['site'].get('village')
+                        
+                        # Extract site_category
+                        if 'site_category' in row['site'] and isinstance(row['site']['site_category'], dict):
+                            site_category = row['site']['site_category'].get('category')
+                    
+                    # Extract admin levels from grids
+                    if 'grids' in row and isinstance(row['grids'], list):
+                        for grid in row['grids']:
+                            if isinstance(grid, dict):
+                                admin_level = grid.get('admin_level')
+                                if admin_level == 'country':
+                                    admin_level_country = grid.get('long_name')
+                                elif admin_level == 'city':
+                                    # If multiple city entries exist, prefer the one with "Greater" prefix
+                                    if admin_level_city is None or (grid.get('long_name', '').startswith('Greater') and not admin_level_city.startswith('Greater')):
+                                        admin_level_city = grid.get('long_name')
+                                elif admin_level == 'division':
+                                    admin_level_division = grid.get('long_name')
                     
                     # Handle deployment_date for location separately to ensure it's a valid timestamp
-                    location_date = datetime.now()  # Default to current time
+                    effective_from = deployment_date if deployment_date else datetime.now()
+                    recorded_at = datetime.now()
                     
-                    # Explicitly build the insert statement to handle nullable timestamps properly
-                    cursor.execute(
-                        """
-                        INSERT INTO dim_location
-                        (device_key, latitude, longitude, site_id, site_name, recorded_at)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (device_key) DO UPDATE
-                        SET latitude = EXCLUDED.latitude,
-                            longitude = EXCLUDED.longitude,
-                            site_id = EXCLUDED.site_id,
-                            site_name = EXCLUDED.site_name,
-                            recorded_at = EXCLUDED.recorded_at
-                        """,
-                        (
-                            device_key,
-                            float(lat),
-                            float(lon),
-                            site_id,
-                            site_name,
-                            location_date
-                        )
-                    )
+                    # Get mount_type and power_type from the device
+                    mount_type = row.get('mountType')
+                    power_type = row.get('powerType')
                     
-                    # If deployment_date is valid, update it separately to avoid NaT issues
+                    # Build the insert statement for dim_location
+                    location_fields = [
+                        "device_key", "latitude", "longitude", "site_id", "site_name", 
+                        "effective_from", "recorded_at", "is_active"
+                    ]
+                    location_values = [
+                        device_key, float(lat), float(lon), site_id, site_name,
+                        effective_from, recorded_at, True
+                    ]
+                    
+                    # Add optional fields
+                    if location_name is not None:
+                        location_fields.append("location_name")
+                        location_values.append(location_name)
+                    
+                    if search_name is not None:
+                        location_fields.append("search_name")
+                        location_values.append(search_name)
+                    
+                    if village is not None:
+                        location_fields.append("village")
+                        location_values.append(village)
+                    
+                    if site_category is not None:
+                        location_fields.append("site_category")
+                        location_values.append(site_category)
+                    
+                    if admin_level_country is not None:
+                        location_fields.append("admin_level_country")
+                        location_values.append(admin_level_country)
+                    
+                    if admin_level_city is not None:
+                        location_fields.append("admin_level_city")
+                        location_values.append(admin_level_city)
+                    
+                    if admin_level_division is not None:
+                        location_fields.append("admin_level_division")
+                        location_values.append(admin_level_division)
+                    
+                    if mount_type is not None:
+                        location_fields.append("mount_type")
+                        location_values.append(mount_type)
+                    
+                    if power_type is not None:
+                        location_fields.append("power_type")
+                        location_values.append(power_type)
+                    
                     if deployment_date is not None:
+                        location_fields.append("deployment_date")
+                        location_values.append(deployment_date)
+                    
+                    # Create placeholders
+                    placeholders = ", ".join(["%s"] * len(location_values))
+                    
+                    # Check if location exists for this device
+                    cursor.execute("SELECT location_key FROM dim_location WHERE device_key = %s", (device_key,))
+                    location_result = cursor.fetchone()
+                    
+                    if location_result:
+                        # If location exists, update the effective_to date of the old record
+                        # and insert a new record
                         cursor.execute(
                             """
                             UPDATE dim_location
-                            SET deployment_date = %s
-                            WHERE device_key = %s
+                            SET effective_to = %s, is_active = false
+                            WHERE device_key = %s AND is_active = true
                             """,
-                            (deployment_date, device_key)
+                            (recorded_at, device_key)
                         )
+                    
+                    # Insert new location record
+                    insert_sql = f"""
+                        INSERT INTO dim_location
+                        ({', '.join(location_fields)})
+                        VALUES ({placeholders})
+                    """
+                    
+                    cursor.execute(insert_sql, location_values)
                 
                 # Record current device status
                 cursor.execute(
@@ -438,14 +517,27 @@ with DAG(
         CREATE TABLE IF NOT EXISTS dim_location (
             location_key SERIAL PRIMARY KEY,
             device_key INTEGER REFERENCES dim_device(device_key),
+            location_name VARCHAR(255),
+            search_name VARCHAR(255),
+            village VARCHAR(255),
             latitude FLOAT,
             longitude FLOAT,
+            admin_level_country VARCHAR(100),
+            admin_level_city VARCHAR(100),
+            admin_level_division VARCHAR(100),
+            site_category VARCHAR(100),
+            mount_type VARCHAR(50),
+            power_type VARCHAR(50),
             site_id VARCHAR(100),
             site_name VARCHAR(255),
             deployment_date TIMESTAMP,
-            recorded_at TIMESTAMP,
-            UNIQUE(device_key)
+            effective_from TIMESTAMP,
+            effective_to TIMESTAMP,
+            is_active BOOLEAN DEFAULT TRUE,
+            recorded_at TIMESTAMP
         );
+
+        CREATE INDEX IF NOT EXISTS idx_device_location ON dim_location(device_key, is_active);
         
         -- Fact tables
         CREATE TABLE IF NOT EXISTS fact_device_status (
@@ -459,6 +551,7 @@ with DAG(
         -- Create indexes
         CREATE INDEX IF NOT EXISTS idx_device_status_timestamp ON fact_device_status(timestamp);
         CREATE INDEX IF NOT EXISTS idx_device_status_device_key ON fact_device_status(device_key);
+        CREATE INDEX IF NOT EXISTS idx_device_location ON dim_location(device_key, is_active);
         """
     )
     
