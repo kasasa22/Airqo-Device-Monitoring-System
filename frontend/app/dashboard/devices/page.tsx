@@ -14,91 +14,23 @@ import {
   AlertTriangle,
   BarChart3,
   Plus,
-  Layers,
-  Battery,
-  BatteryCharging,
-  BatteryLow,
   ArrowRight,
-  Package,
-  AlertOctagon,
   RefreshCw,
   AlertCircle,
+  Clock,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
+  Map
 } from "lucide-react"
-import dynamic from "next/dynamic"
 import Link from "next/link"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import dynamic from "next/dynamic"
 
-// Sample data with more devices across Africa
-const sampleDevices = [
-  // East Africa
-  {
-    id: "KLA001",
-    name: "Kampala Central",
-    status: "active",
-    lat: 0.3476,
-    lng: 32.5825,
-    lastUpdate: "10 min ago",
-    battery: "85%",
-    pm25: 28,
-    pm10: 52,
-    dataCompleteness: "98%",
-    lastMissing: null,
-  },
-  {
-    id: "KLA002",
-    name: "Kampala East",
-    status: "active",
-    lat: 0.33,
-    lng: 32.61,
-    lastUpdate: "5 min ago",
-    battery: "92%",
-    pm25: 32,
-    pm10: 58,
-    dataCompleteness: "71%",
-    lastMissing: "2 days ago",
-  },
-  // More devices...
-  // Include just a few more for the example
-  {
-    id: "NBI001",
-    name: "Nairobi CBD",
-    status: "active",
-    lat: -1.2921,
-    lng: 36.8219,
-    lastUpdate: "12 min ago",
-    battery: "78%",
-    pm25: 24,
-    pm10: 45,
-    dataCompleteness: "85%",
-    lastMissing: "5 days ago",
-  },
-  {
-    id: "LAG001",
-    name: "Lagos Island",
-    status: "active",
-    lat: 6.455,
-    lng: 3.3841,
-    lastUpdate: "7 min ago",
-    battery: "75%",
-    pm25: 48,
-    pm10: 85,
-    dataCompleteness: "100%",
-    lastMissing: null,
-  },
-  {
-    id: "CAI001",
-    name: "Cairo Downtown",
-    status: "active",
-    lat: 30.0444,
-    lng: 31.2357,
-    lastUpdate: "5 min ago",
-    battery: "95%",
-    pm25: 52,
-    pm10: 95,
-    dataCompleteness: "92%",
-    lastMissing: "1 week ago",
-  },
-]
+// API base URL - should be configured in your environment variables
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 // Dynamically import the map component to avoid SSR issues
 const AfricaMap = dynamic(() => import("./africa-map"), {
@@ -114,17 +46,8 @@ const AfricaMap = dynamic(() => import("./africa-map"), {
 })
 
 export default function DevicesPage() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
-  const [showMap, setShowMap] = useState(false)
-
-  // Count devices by status
-  const activeDevices = useMemo(() => sampleDevices.filter((d) => d.status === "active").length, [])
-  const warningDevices = useMemo(() => sampleDevices.filter((d) => d.status === "warning").length, [])
-  const offlineDevices = useMemo(() => sampleDevices.filter((d) => d.status === "offline").length, [])
-
-  // States for fetching device counts (adding API functionality)
+  // State for device data
+  const [devices, setDevices] = useState([])
   const [deviceCounts, setDeviceCounts] = useState({
     total_devices: 0,
     active_devices: 0,
@@ -132,82 +55,228 @@ export default function DevicesPage() {
     deployed_devices: 0,
     not_deployed: 0,
     recalled_devices: 0
-  });
+  })
   
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // Define the fetch function
+  // UI states
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [selectedDeviceId, setSelectedDeviceId] = useState(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [showMap, setShowMap] = useState(false)
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
+  
+  // Fetch device counts
   const fetchDeviceCounts = async () => {
     try {
-      setLoading(true);
-      const response = await fetch('http://localhost:8000/device-counts');
+      const response = await fetch(`${API_BASE_URL}/device-counts`)
       
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(`API error: ${response.status}`)
       }
       
-      const data = await response.json();
-      setDeviceCounts(data);
-      setError(null);
+      const data = await response.json()
+      setDeviceCounts(data)
     } catch (err) {
-      console.error("Error fetching device counts:", err);
-      setError("Failed to load device data");
-    } finally {
-      setLoading(false);
+      console.error("Error fetching device counts:", err)
+      setError("Failed to load device counts")
     }
-  };
-
-  // Call it on component mount
+  }
+  
+  // Fetch devices list
+  const fetchDevices = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      // Use the valid-device-locations endpoint because it includes readings and locations
+      const response = await fetch(`${API_BASE_URL}/valid-device-locations`)
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      setDevices(data)
+    } catch (err) {
+      console.error("Error fetching devices:", err)
+      setError("Failed to load device data")
+    } finally {
+      setLoading(false)
+      setIsRefreshing(false)
+    }
+  }
+  
+  // Initial data load
   useEffect(() => {
-    fetchDeviceCounts();
-  }, []);
-
-  // Calculate percentages for the progress bars
-  const calculatePercentage = (value) => {
-    return deviceCounts.total_devices > 0 
-      ? Math.round((value / deviceCounts.total_devices) * 100) 
-      : 0;
-  };
-
-  const activePercentage = calculatePercentage(deviceCounts.active_devices);
-  const offlinePercentage = calculatePercentage(deviceCounts.offline_devices);
-  const deployedPercentage = calculatePercentage(deviceCounts.deployed_devices);
-  const notDeployedPercentage = calculatePercentage(deviceCounts.not_deployed);
-  const recalledPercentage = calculatePercentage(deviceCounts.recalled_devices);
-
-  // Filter devices based on search term and status filter
-  const filteredDevices = useMemo(() => {
-    return sampleDevices.filter((device) => {
-      const matchesSearch =
-        device.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        device.id.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesStatus = statusFilter === "all" || device.status === statusFilter
-      return matchesSearch && matchesStatus
-    })
-  }, [searchTerm, statusFilter])
-
-  // Delay showing the map to avoid React reconciliation issues
-  useEffect(() => {
+    Promise.all([fetchDeviceCounts(), fetchDevices()])
+    
+    // Delay showing the map to avoid React reconciliation issues
     const timer = setTimeout(() => {
       setShowMap(true)
     }, 1000)
 
     return () => clearTimeout(timer)
   }, [])
+  
+  // Refresh all data
+  const refreshData = () => {
+    setIsRefreshing(true)
+    Promise.all([fetchDeviceCounts(), fetchDevices()])
+  }
+  
+  // Calculate percentages for the progress bars
+  const calculatePercentage = useCallback((value) => {
+    return deviceCounts.total_devices > 0 
+      ? Math.round((value / deviceCounts.total_devices) * 100) 
+      : 0
+  }, [deviceCounts.total_devices])
 
-  // Function to get battery icon based on percentage
-  const getBatteryIcon = useCallback((batteryStr: string) => {
-    const percentage = Number.parseInt(batteryStr.replace("%", ""))
-    if (percentage >= 70) return <BatteryCharging className="h-6 w-6 text-green-500" />
-    if (percentage >= 30) return <Battery className="h-6 w-6 text-yellow-500" />
-    return <BatteryLow className="h-6 w-6 text-red-500" />
+  const activePercentage = calculatePercentage(deviceCounts.active_devices)
+  const offlinePercentage = calculatePercentage(deviceCounts.offline_devices)
+  const deployedPercentage = calculatePercentage(deviceCounts.deployed_devices)
+  const notDeployedPercentage = calculatePercentage(deviceCounts.not_deployed)
+  const recalledPercentage = calculatePercentage(deviceCounts.recalled_devices)
+  
+  // Filter devices based on search term and status filter
+  const filteredDevices = useMemo(() => {
+    return devices.filter((device) => {
+      const matchesSearch =
+        (device.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+        device.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (device.location?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
+        
+      const matchesStatus = statusFilter === "all" || 
+        (statusFilter === "ACTIVE" && device.status === "ACTIVE") ||
+        (statusFilter === "INACTIVE" && device.status === "INACTIVE")
+        
+      return matchesSearch && matchesStatus
+    })
+  }, [devices, searchTerm, statusFilter])
+  
+  // Filter devices with valid coordinates for the map
+  const devicesWithValidCoordinates = useMemo(() => {
+    return devices.filter(device => 
+      device.latitude !== undefined && 
+      device.latitude !== null && 
+      device.longitude !== undefined && 
+      device.longitude !== null &&
+      !isNaN(parseFloat(device.latitude)) &&
+      !isNaN(parseFloat(device.longitude))
+    )
+  }, [devices])
+  
+  // Count devices with valid and invalid coordinates
+  const validCoordinatesCount = devicesWithValidCoordinates.length
+  const invalidCoordinatesCount = devices.length - validCoordinatesCount
+  
+  // Sort devices - active devices first
+  const sortedDevices = useMemo(() => {
+    return [...filteredDevices].sort((a, b) => {
+      // First sort by status (active first)
+      if (a.status === "ACTIVE" && b.status !== "ACTIVE") return -1;
+      if (a.status !== "ACTIVE" && b.status === "ACTIVE") return 1;
+      
+      // Then sort by name
+      return (a.name || "").localeCompare(b.name || "");
+    });
+  }, [filteredDevices]);
+  
+  // Get current page items
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = sortedDevices.slice(indexOfFirstItem, indexOfLastItem);
+  
+  // Change page
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+  
+  // Calculate total pages
+  const totalPages = Math.ceil(sortedDevices.length / itemsPerPage);
+  
+  // Format the reading timestamp to show how long ago it was
+  const formatLastUpdate = useCallback((timestamp) => {
+    if (!timestamp) return "Unknown"
+    
+    try {
+      const date = new Date(timestamp)
+      const now = new Date()
+      const diffMs = now - date
+      const diffMins = Math.floor(diffMs / (1000 * 60))
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+      
+      if (diffMins < 60) {
+        return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`
+      } else if (diffHours < 24) {
+        return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`
+      } else {
+        return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`
+      }
+    } catch (e) {
+      return "Invalid date"
+    }
   }, [])
-
-  // Handle device selection
-  const handleDeviceSelect = useCallback((id: string) => {
+  
+  // Format date for display
+  const formatDate = useCallback((timestamp) => {
+    if (!timestamp) return ""
+    
+    try {
+      const date = new Date(timestamp)
+      return date.toLocaleDateString()
+    } catch (e) {
+      return ""
+    }
+  }, [])
+  
+  // Function to get status badge color
+  const getStatusBadgeClass = useCallback((status) => {
+    return status === "ACTIVE" 
+      ? "bg-green-500 hover:bg-green-600" 
+      : "bg-red-500 hover:bg-red-600"
+  }, [])
+  
+  // Function to get AQI color based on PM2.5 value
+  const getPM25Color = useCallback((value) => {
+    if (value === null || value === undefined) return "bg-gray-400"
+    if (value < 12) return "bg-green-500"
+    if (value < 35.4) return "bg-yellow-500"
+    if (value < 55.4) return "bg-orange-500"
+    if (value < 150.4) return "bg-red-500"
+    if (value < 250.4) return "bg-purple-500"
+    return "bg-red-900"
+  }, [])
+  
+  // Function to get AQI color based on PM10 value
+  const getPM10Color = useCallback((value) => {
+    if (value === null || value === undefined) return "bg-gray-400"
+    if (value < 54) return "bg-green-500"
+    if (value < 154) return "bg-yellow-500"
+    if (value < 254) return "bg-orange-500"
+    if (value < 354) return "bg-red-500"
+    if (value < 424) return "bg-purple-500"
+    return "bg-red-900"
+  }, [])
+  
+  // Handle device selection on map
+  const handleDeviceSelect = useCallback((id) => {
     setSelectedDeviceId(id)
   }, [])
+  
+  // Count devices by status for map legend (but only for devices with valid coordinates)
+  const activeDevicesOnMap = useMemo(() => 
+    devicesWithValidCoordinates.filter(d => d.status === "ACTIVE").length, 
+    [devicesWithValidCoordinates]
+  );
+  
+  const inactiveDevicesOnMap = useMemo(() => 
+    devicesWithValidCoordinates.filter(d => d.status === "INACTIVE").length, 
+    [devicesWithValidCoordinates]
+  );
 
   return (
     <div className="space-y-6">
@@ -218,10 +287,11 @@ export default function DevicesPage() {
             variant="outline" 
             size="sm" 
             className="flex items-center"
-            onClick={() => fetchDeviceCounts()}
+            onClick={refreshData}
+            disabled={isRefreshing}
           >
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> 
-            {loading ? 'Loading...' : 'Refresh Data'}
+            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} /> 
+            {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
           </Button>
           <Button className="bg-primary hover:bg-primary/90">
             <Plus className="mr-2 h-4 w-4" /> Add Device
@@ -241,7 +311,7 @@ export default function DevicesPage() {
         <Card className="overflow-hidden border-l-4 border-l-primary hover:shadow-md transition-shadow">
           <CardHeader className="pb-2 bg-gradient-to-r from-primary/10 to-transparent">
             <CardTitle className="text-sm font-medium flex items-center">
-              <Layers className="mr-2 h-5 w-5 text-primary" />
+              <BarChart3 className="mr-2 h-5 w-5 text-primary" />
               Total Devices
             </CardTitle>
           </CardHeader>
@@ -308,82 +378,68 @@ export default function DevicesPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="overflow-hidden border-l-4 border-l-amber-500 hover:shadow-md transition-shadow">
-          <CardHeader className="pb-2 bg-gradient-to-r from-amber-500/10 to-transparent">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <Package className="mr-2 h-5 w-5 text-amber-500" />
-              Not Deployed
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="text-3xl font-bold">
-              {loading ? '...' : deviceCounts.not_deployed}
-            </div>
-            <div className="flex items-center mt-1">
-              <div className="h-2 bg-amber-500 rounded-full" style={{ width: `${notDeployedPercentage}%` }}></div>
-              <span className="text-xs text-muted-foreground ml-2">{notDeployedPercentage}%</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-l-4 border-l-purple-500 hover:shadow-md transition-shadow">
-          <CardHeader className="pb-2 bg-gradient-to-r from-purple-500/10 to-transparent">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <AlertOctagon className="mr-2 h-5 w-5 text-purple-500" />
-              Recalled Devices
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="text-3xl font-bold">
-              {loading ? '...' : deviceCounts.recalled_devices}
-            </div>
-            <div className="flex items-center mt-1">
-              <div className="h-2 bg-purple-500 rounded-full" style={{ width: `${recalledPercentage}%` }}></div>
-              <span className="text-xs text-muted-foreground ml-2">{recalledPercentage}%</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       <Card className="hover:shadow-md transition-shadow overflow-hidden">
         <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
-          <CardTitle className="flex items-center">
-            <MapPin className="mr-2 h-5 w-5 text-primary" />
-            Device Locations Across Africa
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center">
+              <MapPin className="mr-2 h-5 w-5 text-primary" />
+              Device Locations Across Africa
+            </div>
+            {devicesWithValidCoordinates.length > 0 && (
+              <Badge variant="outline" className="ml-2">
+                {devicesWithValidCoordinates.length} devices with location data
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="h-[600px] w-full">
-            {showMap ? (
-              <AfricaMap
-                devices={sampleDevices}
-                onDeviceSelect={handleDeviceSelect}
-                selectedDeviceId={selectedDeviceId || undefined}
-              />
-            ) : (
-              <div className="h-full w-full flex items-center justify-center bg-gray-100">
-                <div className="text-center">
-                  <MapPin className="h-10 w-10 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-500">Loading map of Africa...</p>
-                </div>
+          {devicesWithValidCoordinates.length === 0 ? (
+            <div className="h-[300px] w-full flex items-center justify-center bg-gray-100">
+              <div className="text-center">
+                <Map className="h-10 w-10 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-600 font-medium">No devices with valid location data</p>
+                <p className="text-gray-500 text-sm mt-1">Add location coordinates to devices to see them on the map</p>
               </div>
-            )}
-          </div>
-          <div className="p-4 bg-gray-50 flex items-center justify-center space-x-6 border-t">
-            <div className="flex items-center">
-              <div className="h-4 w-4 rounded-full bg-green-500 mr-2"></div>
-              <span className="text-sm">Active ({activeDevices})</span>
             </div>
-            <div className="flex items-center">
-              <div className="h-4 w-4 rounded-full bg-yellow-500 mr-2"></div>
-              <span className="text-sm">Warning ({warningDevices})</span>
-            </div>
-            <div className="flex items-center">
-              <div className="h-4 w-4 rounded-full bg-red-500 mr-2"></div>
-              <span className="text-sm">Offline ({offlineDevices})</span>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="h-[600px] w-full">
+                {showMap ? (
+                  <AfricaMap
+                    devices={devicesWithValidCoordinates}
+                    onDeviceSelect={handleDeviceSelect}
+                    selectedDeviceId={selectedDeviceId || undefined}
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                    <div className="text-center">
+                      <MapPin className="h-10 w-10 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500">Loading map of Africa...</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="p-4 bg-gray-50 flex items-center justify-between border-t">
+                <div className="flex items-center space-x-6">
+                  <div className="flex items-center">
+                    <div className="h-4 w-4 rounded-full bg-green-500 mr-2"></div>
+                    <span className="text-sm">Active ({activeDevicesOnMap})</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="h-4 w-4 rounded-full bg-red-500 mr-2"></div>
+                    <span className="text-sm">Inactive ({inactiveDevicesOnMap})</span>
+                  </div>
+                </div>
+                
+                {invalidCoordinatesCount > 0 && (
+                  <div className="text-sm text-gray-500 flex items-center">
+                    <AlertTriangle className="h-4 w-4 mr-1 text-amber-500" />
+                    {invalidCoordinatesCount} {invalidCoordinatesCount === 1 ? 'device is' : 'devices are'} missing valid coordinates
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -400,7 +456,7 @@ export default function DevicesPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search devices..."
+                placeholder="Search by ID, name, or location..."
                 className="pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -408,131 +464,191 @@ export default function DevicesPage() {
             </div>
             <div className="flex items-center space-x-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
-              <select
-                className="border rounded-md p-2 bg-white"
+              <Select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onValueChange={(value) => setStatusFilter(value)}
               >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="warning">Warning</option>
-                <option value="offline">Offline</option>
-              </select>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Device ID</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Name</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Last Update</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Battery</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">PM2.5</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">PM10</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Data Completeness</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredDevices.map((device) => (
-                  <tr key={device.id} className="border-b hover:bg-gray-50 transition-colors">
-                    <td className="py-3 px-4 font-medium">{device.id}</td>
-                    <td className="py-3 px-4">{device.name}</td>
-                    <td className="py-3 px-4">
-                      <Badge
-                        className={`flex items-center ${
-                          device.status === "active"
-                            ? "bg-green-500 hover:bg-green-600"
-                            : device.status === "warning"
-                              ? "bg-yellow-500 hover:bg-yellow-600"
-                              : "bg-red-500 hover:bg-red-600"
-                        }`}
-                      >
-                        {device.status === "active" ? (
-                          <Wifi className="mr-1 h-3 w-3" />
-                        ) : device.status === "warning" ? (
-                          <AlertTriangle className="mr-1 h-3 w-3" />
+          {loading ? (
+            <div className="py-8 flex justify-center items-center">
+              <RefreshCw className="h-10 w-10 text-primary animate-spin" />
+              <span className="ml-4 text-lg">Loading device data...</span>
+            </div>
+          ) : sortedDevices.length === 0 ? (
+            <div className="py-8 text-center text-gray-500">
+              <AlertCircle className="h-10 w-10 mx-auto mb-4 text-gray-400" />
+              <p>No devices found matching your criteria.</p>
+              <p className="text-sm mt-2">Try changing your search or filter settings.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left py-3 px-4 font-medium text-gray-600">Device ID</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-600">Name</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-600">Location</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-600">Last Update</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-600">PM2.5</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-600">PM10</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-600">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentItems.map((device) => (
+                    <tr key={device.id} className="border-b hover:bg-gray-50 transition-colors">
+                      <td className="py-3 px-4 font-medium">{device.id}</td>
+                      <td className="py-3 px-4">{device.name || "Unnamed Device"}</td>
+                      <td className="py-3 px-4">
+                        <Badge
+                          className={`flex items-center ${getStatusBadgeClass(device.status)}`}
+                        >
+                          {device.status === "ACTIVE" ? (
+                            <Wifi className="mr-1 h-3 w-3" />
+                          ) : (
+                            <WifiOff className="mr-1 h-3 w-3" />
+                          )}
+                          {device.status}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{device.location?.name || "Unknown"}</span>
+                          {device.location?.admin_level_city && (
+                            <span className="text-xs text-gray-500">
+                              {[
+                                device.location.admin_level_city,
+                                device.location.admin_level_country
+                              ].filter(Boolean).join(", ")}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        {device.reading_timestamp ? (
+                          <div className="flex flex-col">
+                            <span className="flex items-center">
+                              <Clock className="h-3 w-3 mr-1 text-gray-400" />
+                              {formatLastUpdate(device.reading_timestamp)}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {formatDate(device.reading_timestamp)}
+                            </span>
+                          </div>
                         ) : (
-                          <WifiOff className="mr-1 h-3 w-3" />
+                          <span className="text-gray-400">No recent data</span>
                         )}
-                        {device.status}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4">{device.lastUpdate}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center">
-                        {device.status !== "offline" ? (
-                          <>
-                            {getBatteryIcon(device.battery || "0%")}
-                            <span className="ml-2">{device.battery}</span>
-                          </>
+                      </td>
+                      <td className="py-3 px-4">
+                        {device.pm2_5 !== undefined && device.pm2_5 !== null ? (
+                          <div className="flex items-center">
+                            <div
+                              className={`h-2 w-2 rounded-full mr-2 ${getPM25Color(device.pm2_5)}`}
+                            ></div>
+                            {parseFloat(device.pm2_5).toFixed(1)} µg/m³
+                          </div>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      {device.status !== "offline" ? (
-                        <div className="flex items-center">
-                          <div
-                            className={`h-2 w-2 rounded-full mr-2 ${
-                              device.pm25 < 30 ? "bg-green-500" : device.pm25 < 50 ? "bg-yellow-500" : "bg-red-500"
-                            }`}
-                          ></div>
-                          {device.pm25} µg/m³
-                        </div>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      {device.status !== "offline" ? (
-                        <div className="flex items-center">
-                          <div
-                            className={`h-2 w-2 rounded-full mr-2 ${
-                              device.pm10 < 50 ? "bg-green-500" : device.pm10 < 80 ? "bg-yellow-500" : "bg-red-500"
-                            }`}
-                          ></div>
-                          {device.pm10} µg/m³
-                        </div>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex flex-col">
-                        <div className="flex items-center">
-                          <div
-                            className={`h-2 w-2 rounded-full mr-2 ${
-                              Number.parseInt(device.dataCompleteness) >= 95
-                                ? "bg-green-500"
-                                : Number.parseInt(device.dataCompleteness) >= 80
-                                  ? "bg-yellow-500"
-                                  : "bg-red-500"
-                            }`}
-                          ></div>
-                          {device.dataCompleteness}
-                        </div>
-                        {device.lastMissing && (
-                          <span className="text-xs text-gray-500 mt-1">Last missing: {device.lastMissing}</span>
+                      </td>
+                      <td className="py-3 px-4">
+                        {device.pm10 !== undefined && device.pm10 !== null ? (
+                          <div className="flex items-center">
+                            <div
+                              className={`h-2 w-2 rounded-full mr-2 ${getPM10Color(device.pm10)}`}
+                            ></div>
+                            {parseFloat(device.pm10).toFixed(1)} µg/m³
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
                         )}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Link
-                        href={`/dashboard/devices/${device.id}`}
-                        className="flex items-center text-primary hover:underline"
-                      >
-                        View Details <ArrowRight className="ml-1 h-4 w-4" />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </td>
+                      <td className="py-3 px-4">
+                        <Link
+                          href={`/dashboard/devices/${device.id}`}
+                          className="flex items-center text-primary hover:underline"
+                        >
+                          View Details <ArrowRight className="ml-1 h-4 w-4" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              
+              {/* Pagination */}
+              <div className="mt-4 flex items-center justify-between">
+                <div className="text-sm text-gray-500">
+                  Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, sortedDevices.length)} of {sortedDevices.length} devices
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Select 
+                    value={itemsPerPage.toString()} 
+                    onValueChange={(value) => {
+                      setItemsPerPage(Number(value));
+                      setCurrentPage(1); // Reset to first page when changing items per page
+                    }}
+                  >
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue placeholder="Per page" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5 per page</SelectItem>
+                      <SelectItem value="10">10 per page</SelectItem>
+                      <SelectItem value="25">25 per page</SelectItem>
+                      <SelectItem value="50">50 per page</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <div className="flex items-center">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="h-8 w-8"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="mx-2 text-sm">
+                      Page {currentPage} of {totalPages || 1}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages || totalPages === 0}
+                      className="h-8 w-8"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Last updated info */}
+          <div className="mt-4 flex justify-end items-center text-sm text-gray-500">
+            {devices.length > 0 && (
+              <div className="flex items-center">
+                <Calendar className="h-4 w-4 mr-1" />
+                <span>Last updated: {new Date().toLocaleString()}</span>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
