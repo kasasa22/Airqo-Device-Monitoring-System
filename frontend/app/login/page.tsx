@@ -1,8 +1,7 @@
+// app/login/page.js (or wherever your login page is located)
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState, useEffect, FormEvent } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -10,10 +9,16 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 
+// API URL - adjust this to point to your FastAPI backend
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
   const [logoutMessage, setLogoutMessage] = useState("")
+  const router = useRouter()
 
   useEffect(() => {
     // Check if user was redirected from logout
@@ -23,17 +28,46 @@ export default function LoginPage() {
     }
   }, [])
 
-  async function onSubmit(event: React.FormEvent) {
+  async function onSubmit(event: FormEvent) {
     event.preventDefault()
     setIsLoading(true)
+    setError("") // Clear any existing errors
 
     try {
-      // Add your authentication logic here
-      router.push("/dashboard")
+      // Create form data for FastAPI OAuth2PasswordRequestForm
+      const formData = new FormData();
+      formData.append('username', email); // FastAPI expects 'username' for email
+      formData.append('password', password);
+
+      // Make API call to your FastAPI authentication endpoint
+      const response = await fetch("http://localhost:8000/login", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Save token and user data to localStorage
+        localStorage.setItem('access_token', data.access_token);
+        localStorage.setItem('user_data', JSON.stringify(data.user));
+        
+        // Authentication successful
+        router.push("/dashboard");
+      } else {
+        // Try to get error message from response
+        try {
+          const errorData = await response.json();
+          setError(errorData.detail || "Invalid email or password. Please try again.");
+        } catch (e) {
+          setError("Invalid email or password. Please try again.");
+        }
+      }
     } catch (error) {
-      console.error(error)
+      console.error("Login error:", error);
+      setError("An error occurred during login. Please try again.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
@@ -55,6 +89,9 @@ export default function LoginPage() {
           {logoutMessage && (
             <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-md text-sm">{logoutMessage}</div>
           )}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">{error}</div>
+          )}
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-2">
               <Input
@@ -66,6 +103,8 @@ export default function LoginPage() {
                 autoCorrect="off"
                 disabled={isLoading}
                 required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -76,6 +115,8 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 disabled={isLoading}
                 required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
             </div>
             <Button className="w-full" type="submit" disabled={isLoading}>
@@ -83,16 +124,7 @@ export default function LoginPage() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex justify-center">
-          <p className="text-sm text-muted-foreground">
-            Don't have an account?{" "}
-            <Link href="/register" className="text-primary hover:underline">
-              Sign up
-            </Link>
-          </p>
-        </CardFooter>
       </Card>
     </div>
   )
 }
-
