@@ -42,159 +42,8 @@ import {
 import dynamic from "next/dynamic"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-// Sample device data
-const sampleDevices = [
-  {
-    id: "KLA001",
-    name: "Kampala Central",
-    status: "active",
-    lat: 0.3476,
-    lng: 32.5825,
-    lastUpdate: "10 min ago",
-    battery: "85%",
-    installDate: "2023-05-15",
-    lastMaintenance: "2024-01-20",
-    firmwareVersion: "2.3.1",
-    signalStrength: "92%",
-    location: "Kampala City Center, Uganda",
-    description: "Monitoring air quality in central Kampala business district",
-    uptime: "98.5%",
-    mtbf: "120 days",
-    mttr: "48 hours",
-    failureRate: "8.2%",
-    dataCompleteness: "94.3%",
-    lastCalibration: "2024-03-15",
-    calibrationDrift: "2.8%",
-    powerConsumption: "2.4W",
-    batteryLife: "14 months",
-    sensorHealth: "Good",
-    hardwareVersion: "v3.2",
-  },
-  // More devices...
-]
-
-// Sample historical data with missing data points
-const historicalData = [
-  { date: "2024-06-01", uptime: 98, dataCompleteness: 100, batteryLevel: 95, signalStrength: 92, dataComplete: true },
-  { date: "2024-06-02", uptime: 100, dataCompleteness: 100, batteryLevel: 93, signalStrength: 94, dataComplete: true },
-  { date: "2024-06-03", uptime: 0, dataCompleteness: 0, batteryLevel: 90, signalStrength: 0, dataComplete: false },
-  { date: "2024-06-04", uptime: 100, dataCompleteness: 100, batteryLevel: 89, signalStrength: 91, dataComplete: true },
-  { date: "2024-06-05", uptime: 100, dataCompleteness: 100, batteryLevel: 87, signalStrength: 93, dataComplete: true },
-  { date: "2024-06-06", uptime: 0, dataCompleteness: 0, batteryLevel: 85, signalStrength: 0, dataComplete: false },
-  { date: "2024-06-07", uptime: 100, dataCompleteness: 100, batteryLevel: 85, signalStrength: 92, dataComplete: true },
-]
-
-// Sample calibration drift data
-const calibrationDriftData = [
-  { month: "Jan", pm25Drift: 0.5, pm10Drift: 0.8, tempDrift: 0.2, humidityDrift: 0.3 },
-  { month: "Feb", pm25Drift: 0.8, pm10Drift: 1.2, tempDrift: 0.3, humidityDrift: 0.5 },
-  { month: "Mar", pm25Drift: 1.2, pm10Drift: 1.8, tempDrift: 0.4, humidityDrift: 0.7 },
-  { month: "Apr", pm25Drift: 1.6, pm10Drift: 2.3, tempDrift: 0.5, humidityDrift: 0.9 },
-  { month: "May", pm25Drift: 2.1, pm10Drift: 2.8, tempDrift: 0.6, humidityDrift: 1.2 },
-  { month: "Jun", pm25Drift: 2.8, pm10Drift: 3.5, tempDrift: 0.7, humidityDrift: 1.5 },
-]
-
-// Sample failure history
-const failureHistory = [
-  {
-    date: "2024-05-10",
-    type: "Connectivity",
-    description: "Device lost connection due to network issues",
-    downtime: "6 hours",
-    resolution: "Network restored automatically",
-  },
-  {
-    date: "2024-03-22",
-    type: "Power",
-    description: "Battery depletion due to solar panel malfunction",
-    downtime: "48 hours",
-    resolution: "Solar panel replaced",
-  },
-  {
-    date: "2024-02-15",
-    type: "Sensor",
-    description: "PM2.5 sensor reading anomalies",
-    downtime: "24 hours",
-    resolution: "Sensor cleaned and recalibrated",
-  },
-  {
-    date: "2023-11-30",
-    type: "Physical",
-    description: "Water ingress after heavy rainfall",
-    downtime: "72 hours",
-    resolution: "Device housing sealed and waterproofed",
-  },
-]
-
-// Sample maintenance history
-const maintenanceHistory = [
-  {
-    date: "2024-02-05",
-    type: "Routine",
-    description: "Regular maintenance and sensor calibration",
-    technician: "John Doe",
-  },
-  {
-    date: "2023-11-15",
-    type: "Repair",
-    description: "Battery replacement and firmware update",
-    technician: "Sarah Smith",
-  },
-  {
-    date: "2023-08-22",
-    type: "Calibration",
-    description: "Sensor calibration and dust filter cleaning",
-    technician: "Michael Johnson",
-  },
-  {
-    date: "2023-05-10",
-    type: "Installation",
-    description: "Initial device installation and setup",
-    technician: "David Wilson",
-  },
-]
-
-// Sample data for data transmission tracking
-const dataTransmissionHistory = [
-  { date: "2024-06-01", status: "complete", dataPoints: 144, expectedDataPoints: 144 },
-  { date: "2024-06-02", status: "complete", dataPoints: 144, expectedDataPoints: 144 },
-  { date: "2024-06-03", status: "missing", dataPoints: 0, expectedDataPoints: 144 },
-  { date: "2024-06-04", status: "complete", dataPoints: 144, expectedDataPoints: 144 },
-  { date: "2024-06-05", status: "complete", dataPoints: 144, expectedDataPoints: 144 },
-  { date: "2024-06-06", status: "missing", dataPoints: 0, expectedDataPoints: 144 },
-  { date: "2024-06-07", status: "complete", dataPoints: 144, expectedDataPoints: 144 },
-  { date: "2024-06-08", status: "complete", dataPoints: 144, expectedDataPoints: 144 },
-  { date: "2024-06-09", status: "partial", dataPoints: 96, expectedDataPoints: 144 },
-  { date: "2024-06-10", status: "complete", dataPoints: 144, expectedDataPoints: 144 },
-]
-
-// Sample data for hourly data transmission
-const hourlyDataTransmission = [
-  { hour: "00:00", dataReceived: true, dataVolume: 10 },
-  { hour: "01:00", dataReceived: true, dataVolume: 9 },
-  { hour: "02:00", dataReceived: true, dataVolume: 8 },
-  { hour: "03:00", dataReceived: true, dataVolume: 8 },
-  { hour: "04:00", dataReceived: true, dataVolume: 7 },
-  { hour: "05:00", dataReceived: false, dataVolume: 0 },
-  { hour: "06:00", dataReceived: false, dataVolume: 0 },
-  { hour: "07:00", dataReceived: true, dataVolume: 9 },
-  { hour: "08:00", dataReceived: true, dataVolume: 12 },
-  { hour: "09:00", dataReceived: true, dataVolume: 14 },
-  { hour: "10:00", dataReceived: true, dataVolume: 15 },
-  { hour: "11:00", dataReceived: true, dataVolume: 15 },
-  { hour: "12:00", dataReceived: true, dataVolume: 16 },
-  { hour: "13:00", dataReceived: true, dataVolume: 16 },
-  { hour: "14:00", dataReceived: true, dataVolume: 15 },
-  { hour: "15:00", dataReceived: true, dataVolume: 14 },
-  { hour: "16:00", dataReceived: true, dataVolume: 13 },
-  { hour: "17:00", dataReceived: true, dataVolume: 12 },
-  { hour: "18:00", dataReceived: true, dataVolume: 11 },
-  { hour: "19:00", dataReceived: true, dataVolume: 10 },
-  { hour: "20:00", dataReceived: true, dataVolume: 9 },
-  { hour: "21:00", dataReceived: true, dataVolume: 9 },
-  { hour: "22:00", dataReceived: true, dataVolume: 8 },
-  { hour: "23:00", dataReceived: true, dataVolume: 8 },
-]
+// API base URL - should be configured in your environment variables
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 // Dynamically import the map component with no SSR
 const DeviceMap = dynamic(() => import("../device-map"), {
@@ -209,52 +58,140 @@ const DeviceMap = dynamic(() => import("../device-map"), {
   ),
 })
 
+// Sample data for charts until we have real data from API
+const generateSampleData = (days = 7) => {
+  const data = []
+  const today = new Date()
+  
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(today)
+    date.setDate(date.getDate() - i)
+    const dateStr = date.toISOString().split('T')[0]
+    
+    // Generate some random data with occasional missing points
+    const isMissing = Math.random() > 0.8
+    
+    data.push({
+      date: dateStr,
+      uptime: isMissing ? 0 : Math.floor(Math.random() * 30) + 70,
+      dataCompleteness: isMissing ? 0 : Math.floor(Math.random() * 30) + 70,
+      batteryLevel: Math.max(20, Math.floor(Math.random() * 30) + 60),
+      signalStrength: isMissing ? 0 : Math.floor(Math.random() * 30) + 60,
+      dataComplete: !isMissing
+    })
+  }
+  
+  return data
+}
+
 export default function DeviceDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const [device, setDevice] = useState<any>(null)
+  const [device, setDevice] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState("overview")
   const [showMap, setShowMap] = useState(false)
   const [dataTimeRange, setDataTimeRange] = useState("10days")
-
-  useEffect(() => {
-    // In a real app, you would fetch the device data from an API
-    // For now, we'll use the sample data
-    const deviceId = params.id as string
-    const foundDevice = sampleDevices.find((d) => d.id === deviceId)
-
-    if (foundDevice) {
-      setDevice(foundDevice)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  
+  // Generate sample historical data for charts
+  const [historicalData, setHistoricalData] = useState(generateSampleData(10))
+  
+  // Fetch device data from new API endpoint
+  const fetchDeviceData = async () => {
+    try {
+      setIsRefreshing(true)
+      setError(null)
+      
+      const deviceId = params.id
+      // Use the new endpoint structure
+      const response = await fetch(`${API_BASE_URL}/device-detail/${deviceId}`)
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error("Device not found")
+        }
+        throw new Error(`API error: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      
+      // Prepare actual readings history data if available
+      let preparedReadingsHistory = [];
+      if (data.readings_history && data.readings_history.length > 0) {
+        preparedReadingsHistory = data.readings_history.map(reading => ({
+          date: reading.timestamp ? new Date(reading.timestamp).toISOString().split('T')[0] : 'Unknown',
+          pm2_5: reading.pm2_5 || 0,
+          pm10: reading.pm10 || 0,
+          aqi_category: reading.aqi_category || 'Unknown'
+        })).reverse(); // Display oldest to newest
+      }
+      
+      // Add derived or calculated fields
+      const enhancedDevice = {
+        ...data,
+        uptime: "98.5%", // Example default value if not provided by API
+        dataCompleteness: "94.3%",
+        mtbf: "120 days",
+        mttr: "48 hours",
+        failureRate: "8.2%",
+        sensorHealth: "Good",
+        calibrationDrift: "2.8%",
+        batteryLife: data.device?.power_type === "battery" ? "14 months" : "N/A",
+        batteryLevel: "85%", // Example default value if not provided by API
+        signalStrength: "92%", // Example default value if not provided by API
+        readingsHistory: preparedReadingsHistory.length > 0 ? preparedReadingsHistory : null
+      }
+      
+      setDevice(enhancedDevice)
+      
+      // If there is readings history data, use it to update the historical charts
+      if (preparedReadingsHistory.length > 0) {
+        setHistoricalData(preparedReadingsHistory)
+      }
+    } catch (err) {
+      console.error("Error fetching device data:", err)
+      setError(err.message)
+    } finally {
+      setLoading(false)
+      setIsRefreshing(false)
     }
-
-    setLoading(false)
-
+  }
+  
+  useEffect(() => {
+    fetchDeviceData()
+    
     // Delay showing the map to avoid React reconciliation issues
     const timer = setTimeout(() => {
       setShowMap(true)
     }, 1000)
-
+    
     return () => clearTimeout(timer)
   }, [params.id])
-
+  
   // Function to get battery icon based on percentage
-  const getBatteryIcon = useCallback((batteryStr: string) => {
-    const percentage = Number.parseInt(batteryStr.replace("%", ""))
+  const getBatteryIcon = useCallback((batteryStr) => {
+    if (!batteryStr) return <Battery className="h-6 w-6 text-gray-400" />
+    
+    const percentage = parseInt(batteryStr.replace("%", ""))
+    if (isNaN(percentage)) return <Battery className="h-6 w-6 text-gray-400" />
+    
     if (percentage >= 70) return <BatteryCharging className="h-6 w-6 text-green-500" />
     if (percentage >= 30) return <Battery className="h-6 w-6 text-yellow-500" />
     return <BatteryLow className="h-6 w-6 text-red-500" />
   }, [])
-
+  
   // Function to get status icon
-  const getStatusIcon = useCallback((status: string) => {
-    if (status === "active") return <Wifi className="h-5 w-5 text-green-500" />
+  const getStatusIcon = useCallback((status) => {
+    status = status?.toLowerCase()
+    if (status === "active" || status === "deployed") return <Wifi className="h-5 w-5 text-green-500" />
     if (status === "warning") return <AlertTriangle className="h-5 w-5 text-yellow-500" />
     return <WifiOff className="h-5 w-5 text-red-500" />
   }, [])
-
+  
   // Function to get status badge for data transmission
-  const getDataStatusBadge = useCallback((status: string) => {
+  const getDataStatusBadge = useCallback((status) => {
     switch (status) {
       case "complete":
         return <Badge className="bg-green-500">Complete</Badge>
@@ -266,42 +203,117 @@ export default function DeviceDetailPage() {
         return <Badge className="bg-gray-500">Unknown</Badge>
     }
   }, [])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="flex flex-col items-center">
-          <RefreshCw className="h-8 w-8 text-primary animate-spin mb-2" />
-          <p>Loading device information...</p>
-        </div>
-      </div>
-    )
+  
+  // Function to refresh data
+  const handleRefresh = () => {
+    fetchDeviceData()
   }
-
-  if (!device) {
-    return (
-      <div className="space-y-4">
-        <Button variant="outline" onClick={() => router.back()} className="flex items-center">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Devices
-        </Button>
-
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-10">
-            <AlertTriangle className="h-12 w-12 text-yellow-500 mb-4" />
-            <h2 className="text-xl font-bold mb-2">Device Not Found</h2>
-            <p className="text-muted-foreground mb-4">
-              The device you're looking for doesn't exist or has been removed.
-            </p>
-            <Button onClick={() => router.push("/dashboard/devices")}>View All Devices</Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  
+  // Format dates for display
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "Unknown"
+    try {
+      return new Date(dateStr).toLocaleDateString()
+    } catch (e) {
+      return dateStr
+    }
   }
-
-  // Simplified chart rendering functions to avoid potential issues
+  
+  // Get device status from API data
+  const getDeviceStatus = () => {
+    if (!device) return "unknown"
+    if (device.device?.is_online) return "active"
+    if (device.device?.status === "deployed") return "deployed"
+    return "offline"
+  }
+  
+  // Get location string from device data
+  const getLocationString = () => {
+    if (!device || !device.location) return "Unknown location"
+    
+    const location = []
+    
+    if (device.location.name) location.push(device.location.name)
+    
+    if (device.location.city && !device.location.name?.includes(device.location.city)) {
+      location.push(device.location.city)
+    }
+    
+    if (device.location.country && !device.location.name?.includes(device.location.country)) {
+      location.push(device.location.country)
+    }
+    
+    return location.length > 0 ? location.join(", ") : "Unknown location"
+  }
+  
+  // Sample failure and maintenance history
+  const failureHistory = device?.maintenance_history || [
+    {
+      timestamp: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      maintenance_type: "Offline",
+      description: "Device lost connection due to network issues"
+    },
+    {
+      timestamp: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
+      maintenance_type: "Status Change",
+      description: "Status changed to not deployed"
+    }
+  ]
+  
+  const maintenanceHistory = device?.maintenance_history || [
+    {
+      timestamp: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+      maintenance_type: "Routine",
+      description: "Regular maintenance and sensor calibration",
+    },
+    {
+      timestamp: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(),
+      maintenance_type: "Installation",
+      description: "Initial device installation and setup",
+    }
+  ]
+  
+  // Sample calibration drift data
+  const calibrationDriftData = [
+    { month: "Jan", pm25Drift: 0.5, pm10Drift: 0.8 },
+    { month: "Feb", pm25Drift: 0.8, pm10Drift: 1.2 },
+    { month: "Mar", pm25Drift: 1.2, pm10Drift: 1.8 },
+    { month: "Apr", pm25Drift: 1.6, pm10Drift: 2.3 },
+    { month: "May", pm25Drift: 2.1, pm10Drift: 2.8 },
+    { month: "Jun", pm25Drift: 2.8, pm10Drift: 3.5 },
+  ]
+  
+  // Simplified chart rendering functions
   const renderDataTransmissionChart = () => {
+    // Generate some sample data for the chart or use API data if available
+    const dataTransmissionHistory = device?.readingsHistory || Array(10).fill().map((_, index) => {
+      const date = new Date()
+      date.setDate(date.getDate() - index)
+      const dateStr = date.toISOString().split('T')[0]
+      
+      // Random data with occasional missing or partial data
+      const rand = Math.random()
+      let status, dataPoints
+      
+      if (rand > 0.8) {
+        status = "missing"
+        dataPoints = 0
+      } else if (rand > 0.7) {
+        status = "partial"
+        dataPoints = Math.floor(Math.random() * 70) + 30
+      } else {
+        status = "complete"
+        dataPoints = 144
+      }
+      
+      return {
+        date: dateStr,
+        status,
+        dataPoints,
+        expectedDataPoints: 144
+      }
+    }).reverse()
+    
     return (
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={dataTransmissionHistory}>
@@ -315,38 +327,35 @@ export default function DeviceDetailPage() {
       </ResponsiveContainer>
     )
   }
-
-  const renderHourlyTransmissionChart = () => {
-    return (
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={hourlyDataTransmission}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="hour" />
-          <YAxis />
-          <Tooltip />
-          <Legend />
-          <Bar dataKey="dataVolume" fill="#4CAF50" name="Data Volume (KB)" />
-        </BarChart>
-      </ResponsiveContainer>
-    )
-  }
-
+  
   const renderPerformanceChart = () => {
+    // Use real readings data if available
+    const chartData = device?.readingsHistory || historicalData
+    
     return (
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={historicalData}>
+        <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="date" />
           <YAxis />
           <Tooltip />
           <Legend />
-          <Line type="monotone" dataKey="uptime" stroke="#4CAF50" name="Uptime (%)" />
-          <Line type="monotone" dataKey="dataCompleteness" stroke="#2196F3" name="Data Completeness (%)" />
+          {device?.readingsHistory ? (
+            <>
+              <Line type="monotone" dataKey="pm2_5" stroke="#4CAF50" name="PM2.5 (µg/m³)" />
+              <Line type="monotone" dataKey="pm10" stroke="#2196F3" name="PM10 (µg/m³)" />
+            </>
+          ) : (
+            <>
+              <Line type="monotone" dataKey="uptime" stroke="#4CAF50" name="Uptime (%)" />
+              <Line type="monotone" dataKey="dataCompleteness" stroke="#2196F3" name="Data Completeness (%)" />
+            </>
+          )}
         </LineChart>
       </ResponsiveContainer>
     )
   }
-
+  
   const renderBatteryChart = () => {
     return (
       <ResponsiveContainer width="100%" height="100%">
@@ -361,7 +370,7 @@ export default function DeviceDetailPage() {
       </ResponsiveContainer>
     )
   }
-
+  
   const renderCalibrationChart = () => {
     return (
       <ResponsiveContainer width="100%" height="100%">
@@ -378,6 +387,51 @@ export default function DeviceDetailPage() {
     )
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="flex flex-col items-center">
+          <RefreshCw className="h-8 w-8 text-primary animate-spin mb-2" />
+          <p>Loading device information...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !device) {
+    return (
+      <div className="space-y-4">
+        <Button variant="outline" onClick={() => router.back()} className="flex items-center">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Devices
+        </Button>
+
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-10">
+            <AlertTriangle className="h-12 w-12 text-yellow-500 mb-4" />
+            <h2 className="text-xl font-bold mb-2">Device Not Found</h2>
+            <p className="text-muted-foreground mb-4">
+              {error || "The device you're looking for doesn't exist or has been removed."}
+            </p>
+            <Button onClick={() => router.push("/dashboard/devices")}>View All Devices</Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+  
+  // Create a single device for map with proper format
+  const mapDevice = {
+    id: device.device?.id || "unknown",
+    name: device.device?.name || "Unnamed Device",
+    status: device.device?.is_online ? "active" : "offline",
+    lat: device.location?.latitude,
+    lng: device.location?.longitude,
+    latest_reading: device.latest_reading,
+    lastUpdate: device.device?.last_updated ? 
+      new Date(device.device.last_updated).toLocaleString() : undefined
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -387,17 +441,19 @@ export default function DeviceDetailPage() {
         </Button>
 
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" className="flex items-center">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh Data
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
           </Button>
           <Button variant="outline" size="sm" className="flex items-center">
             <Download className="mr-2 h-4 w-4" />
             Export Data
-          </Button>
-          <Button variant="outline" size="sm" className="flex items-center">
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
           </Button>
         </div>
       </div>
@@ -408,35 +464,44 @@ export default function DeviceDetailPage() {
             <div className="flex justify-between items-start">
               <div>
                 <div className="flex items-center">
-                  {getStatusIcon(device.status)}
-                  <CardTitle className="ml-2">{device.name}</CardTitle>
+                  {getStatusIcon(getDeviceStatus())}
+                  <CardTitle className="ml-2">{device.device?.name || "Unnamed Device"}</CardTitle>
                 </div>
                 <CardDescription className="mt-1">
-                  ID: {device.id} • {device.location}
+                  ID: {device.device?.id} • {getLocationString()}
                 </CardDescription>
               </div>
               <Badge
                 className={
-                  device.status === "active"
+                  getDeviceStatus() === "active"
                     ? "bg-green-500 hover:bg-green-600"
-                    : device.status === "warning"
+                    : getDeviceStatus() === "deployed"
                       ? "bg-yellow-500 hover:bg-yellow-600"
                       : "bg-red-500 hover:bg-red-600"
                 }
               >
-                {device.status.toUpperCase()}
+                {getDeviceStatus().toUpperCase()}
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="h-[300px] w-full">
-              {showMap ? (
-                <DeviceMap devices={[device]} selectedDeviceId={device.id} />
+              {showMap && device.location?.latitude && device.location?.longitude ? (
+                <DeviceMap devices={[mapDevice]} selectedDeviceId={device.device?.id} />
               ) : (
                 <div className="h-full w-full flex items-center justify-center bg-gray-100">
                   <div className="text-center">
-                    <MapPin className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-500">Loading map...</p>
+                    {!showMap ? (
+                      <>
+                        <MapPin className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-500">Loading map...</p>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="h-8 w-8 text-yellow-400 mx-auto mb-2" />
+                        <p className="text-gray-500">No location data available for this device</p>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -445,7 +510,7 @@ export default function DeviceDetailPage() {
           <CardFooter className="bg-gray-50 border-t p-4 text-sm text-muted-foreground">
             <div className="flex items-center">
               <Clock className="mr-2 h-4 w-4 text-primary" />
-              Last updated: {device.lastUpdate}
+              Last updated: {device.device?.last_updated ? formatDate(device.device.last_updated) + ' ' + new Date(device.device.last_updated).toLocaleTimeString() : "Unknown"}
             </div>
           </CardFooter>
         </Card>
@@ -463,8 +528,8 @@ export default function DeviceDetailPage() {
                     <Activity className="h-5 w-5 text-green-500" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Uptime</p>
-                    <p className="text-xl font-semibold">{device.uptime}</p>
+                    <p className="text-sm text-gray-500">Status</p>
+                    <p className="text-xl font-semibold capitalize">{getDeviceStatus()}</p>
                   </div>
                 </div>
               </div>
@@ -472,50 +537,40 @@ export default function DeviceDetailPage() {
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center">
                   <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                    <Battery className="h-5 w-5 text-blue-500" />
+                    <Zap className="h-5 w-5 text-blue-500" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Battery</p>
-                    <p className="text-xl font-semibold">{device.battery}</p>
+                    <p className="text-sm text-gray-500">Power Type</p>
+                    <p className="text-xl font-semibold capitalize">{device.device?.power_type || "Unknown"}</p>
                   </div>
-                </div>
-                <div className="w-20 h-3 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${
-                      Number.parseInt(device.battery) >= 70
-                        ? "bg-green-500"
-                        : Number.parseInt(device.battery) >= 30
-                          ? "bg-yellow-500"
-                          : "bg-red-500"
-                    }`}
-                    style={{ width: device.battery }}
-                  ></div>
                 </div>
               </div>
 
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center">
                   <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center mr-3">
-                    <Clock className="h-5 w-5 text-yellow-500" />
+                    <MapPin className="h-5 w-5 text-yellow-500" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Data Completeness</p>
-                    <p className="text-xl font-semibold">{device.dataCompleteness}</p>
+                    <p className="text-sm text-gray-500">Mount Type</p>
+                    <p className="text-xl font-semibold capitalize">{device.device?.mount_type || "Unknown"}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center">
-                  <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center mr-3">
-                    <Zap className="h-5 w-5 text-purple-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Calibration Drift</p>
-                    <p className="text-xl font-semibold">{device.calibrationDrift}</p>
+              {device.device?.next_maintenance && (
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center mr-3">
+                      <Calendar className="h-5 w-5 text-purple-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Next Maintenance</p>
+                      <p className="text-xl font-semibold">{formatDate(device.device.next_maintenance)}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -541,100 +596,130 @@ export default function DeviceDetailPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-gray-500">Device ID</p>
-                      <p className="font-medium">{device.id}</p>
+                      <p className="font-medium">{device.device?.id}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">Status</p>
                       <div className="flex items-center">
-                        {getStatusIcon(device.status)}
-                        <span className="ml-1 capitalize">{device.status}</span>
+                        {getStatusIcon(getDeviceStatus())}
+                        <span className="ml-1 capitalize">{getDeviceStatus()}</span>
                       </div>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Installation Date</p>
-                      <p className="font-medium">{device.installDate}</p>
+                      <p className="text-sm text-gray-500">First Seen</p>
+                      <p className="font-medium">{formatDate(device.device?.first_seen)}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Last Maintenance</p>
-                      <p className="font-medium">{device.lastMaintenance}</p>
+                      <p className="text-sm text-gray-500">Last Updated</p>
+                      <p className="font-medium">{formatDate(device.device?.last_updated)}</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Firmware Version</p>
-                      <p className="font-medium">{device.firmwareVersion}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Hardware Version</p>
-                      <p className="font-medium">{device.hardwareVersion}</p>
-                    </div>
+                    {device.device?.network && (
+                      <div>
+                        <p className="text-sm text-gray-500">Network</p>
+                        <p className="font-medium">{device.device.network}</p>
+                      </div>
+                    )}
+                    {device.device?.category && (
+                      <div>
+                        <p className="text-sm text-gray-500">Category</p>
+                        <p className="font-medium">{device.device.category}</p>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Location</p>
-                    <p className="font-medium">{device.location}</p>
+                    <p className="font-medium">{getLocationString()}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Description</p>
-                    <p className="font-medium">{device.description}</p>
-                  </div>
+                  {device.device?.height && (
+                    <div>
+                      <p className="text-sm text-gray-500">Height</p>
+                      <p className="font-medium">{device.device.height} m</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
-                <CardTitle className="text-lg">Performance Metrics</CardTitle>
+                <CardTitle className="text-lg">Location Details</CardTitle>
               </CardHeader>
               <CardContent className="p-4">
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center">
-                      <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center mr-3">
-                        <Activity className="h-5 w-5 text-green-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Uptime</p>
-                        <p className="font-medium">{device.uptime}</p>
-                      </div>
-                    </div>
-                    <div className="w-20 h-3 bg-gray-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-green-500" style={{ width: device.uptime }}></div>
-                    </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {device.location?.latitude && device.location?.longitude && (
+                      <>
+                        <div>
+                          <p className="text-sm text-gray-500">Latitude</p>
+                          <p className="font-medium">{device.location.latitude}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Longitude</p>
+                          <p className="font-medium">{device.location.longitude}</p>
+                        </div>
+                      </>
+                    )}
                   </div>
-
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                        <Timer className="h-5 w-5 text-blue-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">MTBF</p>
-                        <p className="font-medium">{device.mtbf}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center">
-                      <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center mr-3">
-                        <Wrench className="h-5 w-5 text-yellow-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">MTTR</p>
-                        <p className="font-medium">{device.mttr}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center">
-                      <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center mr-3">
-                        <AlertTriangle className="h-5 w-5 text-red-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Failure Rate</p>
-                        <p className="font-medium">{device.failureRate}</p>
+                  
+                  {/* Site information if available */}
+                  {device.site && Object.values(device.site).some(value => value) && (
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <h3 className="font-medium mb-2">Site Information</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        {device.site.name && (
+                          <div>
+                            <p className="text-sm text-gray-500">Site Name</p>
+                            <p className="font-medium">{device.site.name}</p>
+                          </div>
+                        )}
+                        {device.site.data_provider && (
+                          <div>
+                            <p className="text-sm text-gray-500">Data Provider</p>
+                            <p className="font-medium">{device.site.data_provider}</p>
+                          </div>
+                        )}
+                        {device.site.category && (
+                          <div>
+                            <p className="text-sm text-gray-500">Site Category</p>
+                            <p className="font-medium">{device.site.category}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
+                  )}
+                  
+                  {/* Location information if available */}
+                  {device.location && (
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <h3 className="font-medium mb-2">Administrative Location</h3>
+                      <div className="grid grid-cols-1 gap-2">
+                        {device.location.country && (
+                          <div>
+                            <p className="text-sm text-gray-500">Country</p>
+                            <p className="font-medium">{device.location.country}</p>
+                          </div>
+                        )}
+                        {device.location.city && (
+                          <div>
+                            <p className="text-sm text-gray-500">City</p>
+                            <p className="font-medium">{device.location.city}</p>
+                          </div>
+                        )}
+                        {device.location.division && (
+                          <div>
+                            <p className="text-sm text-gray-500">Division</p>
+                            <p className="font-medium">{device.location.division}</p>
+                          </div>
+                        )}
+                        {device.location.deployment_date && (
+                          <div>
+                            <p className="text-sm text-gray-500">Deployment Date</p>
+                            <p className="font-medium">{formatDate(device.location.deployment_date)}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -670,38 +755,142 @@ export default function DeviceDetailPage() {
               <div className="h-80">{renderDataTransmissionChart()}</div>
 
               <div className="mt-6">
-                <h3 className="text-md font-medium mb-2">Data Transmission Summary</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Date</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Data Points</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Expected</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-600">Completeness</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dataTransmissionHistory.map((record, index) => (
-                        <tr
-                          key={record.date}
-                          className={`border-b hover:bg-gray-50 transition-colors ${
-                            index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
-                          }`}
-                        >
-                          <td className="py-3 px-4">{record.date}</td>
-                          <td className="py-3 px-4">{getDataStatusBadge(record.status)}</td>
-                          <td className="py-3 px-4">{record.dataPoints}</td>
-                          <td className="py-3 px-4">{record.expectedDataPoints}</td>
-                          <td className="py-3 px-4">
-                            {Math.round((record.dataPoints / record.expectedDataPoints) * 100)}%
-                          </td>
+                <h3 className="text-md font-medium mb-2">Latest Data Readings</h3>
+                {device.latest_reading?.pm2_5 !== undefined || device.latest_reading?.pm10 !== undefined ? (
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="grid grid-cols-2 gap-4">
+                      {device.latest_reading.pm2_5 !== undefined && (
+                        <div>
+                          <p className="text-sm text-gray-500">PM2.5</p>
+                          <p className="text-xl font-semibold">{typeof device.latest_reading.pm2_5 === 'number' ? device.latest_reading.pm2_5.toFixed(1) : device.latest_reading.pm2_5} µg/m³</p>
+                        </div>
+                      )}
+                      {device.latest_reading.pm10 !== undefined && (
+                        <div>
+                          <p className="text-sm text-gray-500">PM10</p>
+                          <p className="text-xl font-semibold">{typeof device.latest_reading.pm10 === 'number' ? device.latest_reading.pm10.toFixed(1) : device.latest_reading.pm10} µg/m³</p>
+                        </div>
+                      )}
+                      {device.latest_reading.aqi_category && (
+                        <div>
+                          <p className="text-sm text-gray-500">AQI Category</p>
+                          <Badge className={
+                            device.latest_reading.aqi_category === "Good" ? "bg-green-500" :
+                            device.latest_reading.aqi_category === "Moderate" ? "bg-yellow-500" :
+                            device.latest_reading.aqi_category === "Unhealthy for Sensitive Groups" ? "bg-orange-500" :
+                            device.latest_reading.aqi_category === "Unhealthy" ? "bg-red-500" :
+                            device.latest_reading.aqi_category === "Very Unhealthy" ? "bg-purple-500" :
+                            device.latest_reading.aqi_category === "Hazardous" ? "bg-red-800" : "bg-gray-500"
+                          }>
+                            {device.latest_reading.aqi_category}
+                          </Badge>
+                        </div>
+                      )}
+                      {device.latest_reading.timestamp && (
+                        <div className="col-span-2">
+                          <p className="text-sm text-gray-500">Reading Time</p>
+                          <p className="font-medium">{formatDate(device.latest_reading.timestamp)}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-gray-100 rounded-lg text-center">
+                    <p className="text-gray-500">No sensor readings available</p>
+                  </div>
+                )}
+
+                <h3 className="text-md font-medium mt-4 mb-2">Data Transmission Summary</h3>
+                {device.readings_history && device.readings_history.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="text-left py-3 px-4 font-medium text-gray-600">Date</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-600">PM2.5</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-600">PM10</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-600">AQI Category</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {device.readings_history.map((reading, idx) => (
+                          <tr key={reading.timestamp} className="border-b hover:bg-gray-50 transition-colors">
+                            <td className="py-3 px-4">{formatDate(reading.timestamp)}</td>
+                            <td className="py-3 px-4">{typeof reading.pm2_5 === 'number' ? reading.pm2_5.toFixed(1) : (reading.pm2_5 || 'N/A')} µg/m³</td>
+                            <td className="py-3 px-4">{typeof reading.pm10 === 'number' ? reading.pm10.toFixed(1) : (reading.pm10 || 'N/A')} µg/m³</td>
+                            <td className="py-3 px-4">
+                              {reading.aqi_category ? (
+                                <Badge className={
+                                  reading.aqi_category === "Good" ? "bg-green-500" :
+                                  reading.aqi_category === "Moderate" ? "bg-yellow-500" :
+                                  reading.aqi_category === "Unhealthy for Sensitive Groups" ? "bg-orange-500" :
+                                  reading.aqi_category === "Unhealthy" ? "bg-red-500" :
+                                  reading.aqi_category === "Very Unhealthy" ? "bg-purple-500" :
+                                  reading.aqi_category === "Hazardous" ? "bg-red-800" : "bg-gray-500"
+                                }>
+                                  {reading.aqi_category}
+                                </Badge>
+                              ) : (
+                                'N/A'
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="text-left py-3 px-4 font-medium text-gray-600">Date</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-600">Data Points</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-600">Expected</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-600">Completeness</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Generate sample data for last 7 days */}
+                        {Array(7).fill().map((_, index) => {
+                          const date = new Date()
+                          date.setDate(date.getDate() - index)
+                          const dateStr = date.toISOString().split('T')[0]
+                          
+                          // Generate random data
+                          const rand = Math.random()
+                          let status, dataPoints
+                          
+                          if (rand > 0.8) {
+                            status = "missing"
+                            dataPoints = 0
+                          } else if (rand > 0.7) {
+                            status = "partial"
+                            dataPoints = Math.floor(Math.random() * 70) + 30
+                          } else {
+                            status = "complete"
+                            dataPoints = 144
+                          }
+                          
+                          const expectedDataPoints = 144
+                          
+                          return (
+                            <tr key={dateStr} className="border-b hover:bg-gray-50 transition-colors">
+                              <td className="py-3 px-4">{dateStr}</td>
+                              <td className="py-3 px-4">{getDataStatusBadge(status)}</td>
+                              <td className="py-3 px-4">{dataPoints}</td>
+                              <td className="py-3 px-4">{expectedDataPoints}</td>
+                              <td className="py-3 px-4">
+                                {dataPoints > 0 ? Math.round((dataPoints / expectedDataPoints) * 100) + '%' : '0%'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </CardContent>
             <CardFooter className="bg-gray-50 border-t px-4 py-3">
@@ -710,104 +899,13 @@ export default function DeviceDetailPage() {
                 <AlertTitle>Data Transmission Analysis</AlertTitle>
                 <AlertDescription>
                   <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
-                    <li>Device failed to transmit data on June 3rd and June 6th</li>
-                    <li>Device sent partial data (67%) on June 9th</li>
-                    <li>Overall data completeness for the period: 80%</li>
+                    <li>Some data points may be simulated for demonstration purposes</li>
+                    <li>Real data is shown when available from the device's history</li>
+                    <li>Overall data completeness is estimated based on recent API connectivity</li>
                   </ul>
                 </AlertDescription>
               </Alert>
             </CardFooter>
-          </Card>
-
-          <Card>
-            <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
-              <CardTitle className="text-lg flex items-center">
-                <Clock className="mr-2 h-5 w-5 text-primary" />
-                Hourly Data Transmission Pattern
-              </CardTitle>
-              <CardDescription>Data transmission by hour of day (last 24 hours)</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4">
-              <div className="h-80">{renderHourlyTransmissionChart()}</div>
-            </CardContent>
-            <CardFooter className="bg-gray-50 border-t px-4 py-3">
-              <div className="flex items-center text-sm text-muted-foreground">
-                <Info className="mr-2 h-4 w-4 text-primary" />
-                Device failed to transmit data between 05:00-07:00, likely due to power-saving mode or connectivity
-                issues
-              </div>
-            </CardFooter>
-          </Card>
-
-          <Card>
-            <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
-              <CardTitle className="text-lg flex items-center">
-                <Activity className="mr-2 h-5 w-5 text-primary" />
-                Data Flow Analysis
-              </CardTitle>
-              <CardDescription>Patterns in data transmission volume over time</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4">
-              <div className="space-y-4">
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-                  <h3 className="text-md font-medium mb-2 text-blue-800">Data Flow Summary</h3>
-                  <ul className="list-disc pl-5 space-y-2 text-blue-700">
-                    <li>
-                      <strong>Normal Pattern:</strong> Device typically sends 144 data points per day (6 per hour)
-                    </li>
-                    <li>
-                      <strong>Peak Hours:</strong> Highest data volume occurs between 12:00-14:00 (16 KB/hour)
-                    </li>
-                    <li>
-                      <strong>Low Hours:</strong> Lowest data volume occurs between 02:00-05:00 (7-8 KB/hour)
-                    </li>
-                    <li>
-                      <strong>Missing Data:</strong> Complete data loss on June 3rd and 6th
-                    </li>
-                    <li>
-                      <strong>Partial Data:</strong> 67% data completeness on June 9th
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <h3 className="text-md font-medium mb-2 text-yellow-800">Data Transmission Patterns</h3>
-                  <ul className="list-disc pl-5 space-y-2 text-yellow-700">
-                    <li>
-                      <strong>Periodic Gaps:</strong> Device shows a pattern of data transmission failures approximately
-                      every 3-4 days, suggesting a potential issue with the device's power management or connectivity
-                      cycle
-                    </li>
-                    <li>
-                      <strong>Daily Patterns:</strong> Data volume consistently decreases during early morning hours
-                      (02:00-05:00)
-                    </li>
-                    <li>
-                      <strong>Recovery Time:</strong> After data transmission failures, the device typically resumes
-                      normal operation within 24 hours
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                  <h3 className="text-md font-medium mb-2 text-green-800">Recommendations</h3>
-                  <ul className="list-disc pl-5 space-y-2 text-green-700">
-                    <li>
-                      <strong>Investigate Power Issues:</strong> Check battery and solar panel performance during early
-                      morning hours
-                    </li>
-                    <li>
-                      <strong>Network Connectivity:</strong> Verify signal strength and network availability in the
-                      device location
-                    </li>
-                    <li>
-                      <strong>Firmware Update:</strong> Consider updating to the latest firmware version to improve data
-                      transmission reliability
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
           </Card>
         </TabsContent>
 
@@ -817,7 +915,7 @@ export default function DeviceDetailPage() {
               <div className="flex justify-between items-center">
                 <div>
                   <CardTitle className="text-lg">Device Performance History</CardTitle>
-                  <CardDescription>Uptime and data completeness over time</CardDescription>
+                  <CardDescription>PM2.5 and PM10 readings over time</CardDescription>
                 </div>
                 <div className="flex items-center space-x-2">
                   <select className="border rounded-md p-2 text-sm">
@@ -838,284 +936,93 @@ export default function DeviceDetailPage() {
 
               <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                 <div className="flex items-center text-sm text-yellow-700">
-                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" />
                   <span>
-                    <strong>Missing Data:</strong> Gaps in the chart indicate time periods when the device was offline
-                    or didn't send data.
+                    This is a view-only demonstration. Settings changes will be implemented in a future version.
                   </span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
-                <CardTitle className="text-lg">Battery & Signal Strength</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="h-60">{renderBatteryChart()}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
-                <CardTitle className="text-lg">Calibration Drift</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="h-60">{renderCalibrationChart()}</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
-              <CardTitle className="text-lg">Failure History</CardTitle>
-              <CardDescription>Record of device failures and downtime</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Date</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Type</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Description</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Downtime</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Resolution</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {failureHistory.map((record, index) => (
-                      <tr
-                        key={index}
-                        className={`border-b hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
-                      >
-                        <td className="py-3 px-4">{record.date}</td>
-                        <td className="py-3 px-4">
-                          <Badge
-                            className={
-                              record.type === "Connectivity"
-                                ? "bg-blue-500"
-                                : record.type === "Power"
-                                  ? "bg-yellow-500"
-                                  : record.type === "Sensor"
-                                    ? "bg-purple-500"
-                                    : "bg-red-500"
-                            }
-                          >
-                            {record.type}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">{record.description}</td>
-                        <td className="py-3 px-4">{record.downtime}</td>
-                        <td className="py-3 px-4">{record.resolution}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="maintenance" className="space-y-4">
-          <Card>
-            <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle className="text-lg">Maintenance History</CardTitle>
-                  <CardDescription>Record of all maintenance activities</CardDescription>
-                </div>
-                <Button variant="outline" size="sm">
-                  <Calendar className="h-4 w-4 mr-1" />
-                  Schedule Maintenance
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Date</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Type</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Description</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">Technician</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {maintenanceHistory.map((record, index) => (
-                      <tr
-                        key={index}
-                        className={`border-b hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
-                      >
-                        <td className="py-3 px-4">{record.date}</td>
-                        <td className="py-3 px-4">
-                          <Badge
-                            className={
-                              record.type === "Routine"
-                                ? "bg-blue-500"
-                                : record.type === "Repair"
-                                  ? "bg-yellow-500"
-                                  : record.type === "Calibration"
-                                    ? "bg-purple-500"
-                                    : "bg-green-500"
-                            }
-                          >
-                            {record.type}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">{record.description}</td>
-                        <td className="py-3 px-4">{record.technician}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
-              <CardTitle className="text-lg">Device Health</CardTitle>
-              <CardDescription>Overall device performance metrics</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500 mb-1">Uptime</p>
-                  <div className="flex items-center justify-between">
-                    <p className="text-xl font-semibold">98.5%</p>
-                    <div className="h-2 w-24 bg-gray-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-green-500" style={{ width: "98.5%" }}></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500 mb-1">Data Completeness</p>
-                  <div className="flex items-center justify-between">
-                    <p className="text-xl font-semibold">71.4%</p>
-                    <div className="h-2 w-24 bg-gray-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-yellow-500" style={{ width: "71.4%" }}></div>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">2 missing data points in last 7 days</p>
-                </div>
-
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500 mb-1">Sensor Health</p>
-                  <div className="flex items-center justify-between">
-                    <p className="text-xl font-semibold">Good</p>
-                    <div className="h-2 w-24 bg-gray-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-green-500" style={{ width: "94.8%" }}></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <h3 className="text-md font-medium mb-2">Maintenance Recommendations</h3>
-                <div className="space-y-3">
-                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                    <div className="flex items-center">
-                      <div className="h-8 w-8 rounded-full bg-yellow-100 flex items-center justify-center mr-3">
-                        <Battery className="h-4 w-4 text-yellow-500" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Battery Replacement</p>
-                        <p className="text-sm text-gray-600">Recommended in 3 months based on current discharge rate</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <div className="flex items-center">
-                      <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                        <Zap className="h-4 w-4 text-blue-500" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Sensor Calibration</p>
-                        <p className="text-sm text-gray-600">
-                          Due in 2 weeks (last calibration: {device.lastCalibration})
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                    <div className="flex items-center">
-                      <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center mr-3">
-                        <Settings className="h-4 w-4 text-green-500" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Routine Maintenance</p>
-                        <p className="text-sm text-gray-600">Scheduled for next month</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="settings" className="space-y-4">
-          <Card>
-            <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
-              <CardTitle className="text-lg">Device Settings</CardTitle>
-              <CardDescription>Configure device parameters</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4">
+            
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Device Name</label>
-                    <input type="text" className="w-full p-2 border rounded-md" defaultValue={device.name} />
+                    <input type="text" className="w-full p-2 border rounded-md" defaultValue={device.device?.name || "Unnamed Device"} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Location</label>
-                    <input type="text" className="w-full p-2 border rounded-md" defaultValue={device.location} />
+                    <input type="text" className="w-full p-2 border rounded-md" defaultValue={getLocationString()} />
                   </div>
+                  
                   <div>
-                    <label className="block text-sm font-medium mb-1">Description</label>
-                    <input type="text" className="w-full p-2 border rounded-md" defaultValue={device.description} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Firmware Version</label>
+                    <label className="block text-sm font-medium mb-1">Status</label>
                     <select className="w-full p-2 border rounded-md">
-                      <option value="2.3.1">2.3.1 (Current)</option>
-                      <option value="2.3.2">2.3.2 (Available)</option>
+                      <option value="deployed" selected={device.device?.status === "deployed"}>Deployed</option>
+                      <option value="not deployed" selected={device.device?.status === "not deployed"}>Not Deployed</option>
+                      <option value="recalled" selected={device.device?.status === "recalled"}>Recalled</option>
                     </select>
                   </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Category</label>
+                    <input type="text" className="w-full p-2 border rounded-md" defaultValue={device.device?.category || ""} />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Reporting Frequency</label>
-                  <select className="w-full p-2 border rounded-md">
-                    <option value="5">Every 5 minutes</option>
-                    <option value="10">Every 10 minutes</option>
-                    <option value="15">Every 15 minutes</option>
-                    <option value="30">Every 30 minutes</option>
-                    <option value="60">Every hour</option>
-                  </select>
+                  <label className="block text-sm font-medium mb-1">Next Maintenance Date</label>
+                  <input 
+                    type="date" 
+                    className="w-full p-2 border rounded-md"
+                    defaultValue={device.device?.next_maintenance ? device.device.next_maintenance.split('T')[0] : ""} 
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Power Management</label>
+                  <label className="block text-sm font-medium mb-1">Device Configuration</label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Sleep Mode</label>
-                      <select className="w-full p-2 border rounded-md">
-                        <option value="disabled">Disabled</option>
-                        <option value="light">Light (Sensors only)</option>
-                        <option value="deep">Deep (All systems)</option>
+                      <label className="block text-xs text-gray-500 mb-1">Power Type</label>
+                      <select className="w-full p-2 border rounded-md" defaultValue={device.device?.power_type || ""}>
+                        <option value="">Select Power Type</option>
+                        <option value="solar">Solar</option>
+                        <option value="mains">Mains</option>
+                        <option value="battery">Battery</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Low Battery Threshold (%)</label>
-                      <input type="number" className="w-full p-2 border rounded-md" defaultValue="20" />
+                      <label className="block text-xs text-gray-500 mb-1">Mount Type</label>
+                      <select className="w-full p-2 border rounded-md" defaultValue={device.device?.mount_type || ""}>
+                        <option value="">Select Mount Type</option>
+                        <option value="pole">Pole</option>
+                        <option value="wall">Wall</option>
+                        <option value="roof">Roof</option>
+                        <option value="street light">Street Light</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Location Coordinates</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Latitude</label>
+                      <input 
+                        type="number" 
+                        step="0.000001"
+                        className="w-full p-2 border rounded-md" 
+                        defaultValue={device.location?.latitude || ""} 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Longitude</label>
+                      <input 
+                        type="number" 
+                        step="0.000001"
+                        className="w-full p-2 border rounded-md" 
+                        defaultValue={device.location?.longitude || ""} 
+                      />
                     </div>
                   </div>
                 </div>
@@ -1127,9 +1034,40 @@ export default function DeviceDetailPage() {
               </div>
             </CardContent>
           </Card>
+          
+          <Card>
+            <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
+              <CardTitle className="text-lg flex items-center">
+                <Settings className="mr-2 h-5 w-5 text-primary" />
+                Advanced Settings
+              </CardTitle>
+              <CardDescription>Configuration options for advanced users</CardDescription>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="space-y-4">
+                <div className="p-4 border border-gray-200 rounded-lg">
+                  <h3 className="font-medium mb-2 flex items-center">
+                    <AlertTriangle className="mr-2 h-4 w-4 text-yellow-500" />
+                    Danger Zone
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    These actions are irreversible and should be used with caution.
+                  </p>
+                  <div className="space-y-2">
+                    <Button variant="outline" className="w-full text-left justify-start border-red-200 text-red-600 hover:text-red-700 hover:bg-red-50">
+                      Reset Device Configuration
+                    </Button>
+                    <Button variant="outline" className="w-full text-left justify-start border-red-200 text-red-600 hover:text-red-700 hover:bg-red-50">
+                      Decommission Device
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
-  )
+  
+)
 }
-

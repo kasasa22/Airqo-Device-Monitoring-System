@@ -1,0 +1,41 @@
+services:
+  # Main web service
+  - type: web
+    name: airqo-monitoring-api
+    env: docker
+    dockerfilePath: ./dockerfile
+    dockerContext: .
+    plan: standard
+    branch: main
+    numInstances: 1
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: airqo-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: airqo-redis
+          type: redis
+          property: connectionString
+
+  # PostgreSQL Database
+  - type: pserv
+    name: airqo-postgres
+    env: docker
+    repo: https://github.com/render-examples/postgres
+    plan: standard
+    branch: main
+    disk:
+      name: postgres-data
+      mountPath: /var/lib/postgresql/data
+      sizeGB: 10
+
+  # Redis for caching
+  - type: redis
+    name: airqo-redis
+    plan: standard
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: everywhere

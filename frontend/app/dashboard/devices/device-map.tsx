@@ -12,8 +12,14 @@ interface Device {
   lng: number
   lastUpdate?: string
   battery?: string
-  pm25?: number
-  pm10?: number
+  latest_reading?: {
+    pm2_5: number
+    pm10: number
+    timestamp?: string
+    aqi_category?: string
+    aqi_color?: string
+    no2?: number
+  }
 }
 
 interface DeviceMapProps {
@@ -27,6 +33,11 @@ export default function DeviceMap({ devices = [], selectedDeviceId }: DeviceMapP
   const markersRef = useRef<L.Marker[]>([])
   const geoJsonLayerRef = useRef<L.GeoJSON | null>(null)
   const hasInitializedRef = useRef(false)
+
+  // Log the devices to help with debugging
+  useEffect(() => {
+    console.log("Devices passed to map:", devices);
+  }, [devices]);
 
   // Initialize map and update markers in a single useEffect
   useEffect(() => {
@@ -92,6 +103,8 @@ export default function DeviceMap({ devices = [], selectedDeviceId }: DeviceMapP
 
         // Add markers
         devices.forEach((device) => {
+          console.log("Rendering device on map:", device.id, "with readings:", device.latest_reading);
+          
           const isSelected = device.id === selectedDeviceId
           const icon = createCustomIcon(device.status, isSelected)
 
@@ -101,6 +114,13 @@ export default function DeviceMap({ devices = [], selectedDeviceId }: DeviceMapP
 
           // Store marker for cleanup
           markersRef.current.push(marker)
+
+          // Format PM2.5 and PM10 values with 1 decimal place if they exist
+          const pm25Value = device.latest_reading?.pm2_5 !== undefined && device.latest_reading?.pm2_5 !== null ? 
+            Number(device.latest_reading.pm2_5).toFixed(1) : 'No data';
+          
+          const pm10Value = device.latest_reading?.pm10 !== undefined && device.latest_reading?.pm10 !== null ? 
+            Number(device.latest_reading.pm10).toFixed(1) : 'No data';
 
           // Add popup with device info
           marker.bindPopup(`
@@ -119,8 +139,10 @@ export default function DeviceMap({ devices = [], selectedDeviceId }: DeviceMapP
               ${
                 device.status !== "offline"
                   ? `
-                <p style="margin: 0 0 5px;">PM2.5: ${device.pm25} µg/m³</p>
-                <p style="margin: 0 0 5px;">PM10: ${device.pm10} µg/m³</p>
+                <p style="margin: 0 0 5px;">PM2.5: ${pm25Value} μg/m³</p>
+                <p style="margin: 0 0 5px;">PM10: ${pm10Value} μg/m³</p>
+                ${device.latest_reading?.aqi_category ? 
+                  `<p style="margin: 0 0 5px;">AQI: ${device.latest_reading.aqi_category}</p>` : ''}
               `
                   : ""
               }
@@ -253,4 +275,3 @@ export default function DeviceMap({ devices = [], selectedDeviceId }: DeviceMapP
 
   return <div ref={mapRef} className="h-full w-full" />
 }
-

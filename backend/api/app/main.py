@@ -590,3 +590,227 @@ def get_valid_device_locations(db=Depends(get_db)):
     except Exception as e:
         print(f"Error in valid-device-locations endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch valid device locations: {str(e)}")
+    
+
+@app.get("/device-detail/{device_id}")
+def get_device_detail(device_id: str, db=Depends(get_db)):
+    try:
+        # Complex query joining multiple tables to get comprehensive device information
+        query = text("""
+            WITH latest_readings AS (
+                SELECT DISTINCT ON (device_key) 
+                    device_key,
+                    site_key,
+                    timestamp,
+                    pm2_5,
+                    pm10,
+                    no2,
+                    aqi_category,
+                    aqi_color,
+                    aqi_color_name
+                FROM fact_device_readings
+                ORDER BY device_key, timestamp DESC
+            ),
+            latest_status AS (
+                SELECT DISTINCT ON (device_key)
+                    device_key,
+                    timestamp,
+                    is_online,
+                    device_status
+                FROM fact_device_status
+                ORDER BY device_key, timestamp DESC
+            )
+            SELECT 
+                -- Device basic information
+                d.device_key,
+                d.device_id,
+                d.device_name,
+                d.network,
+                d.category,
+                d.is_active,
+                d.status,
+                d.mount_type,
+                d.power_type,
+                d.height,
+                d.next_maintenance,
+                d.first_seen,
+                d.last_updated,
+                
+                -- Location information
+                l.location_key,
+                l.latitude,
+                l.longitude,
+                l.location_name,
+                l.search_name,
+                l.village,
+                l.admin_level_country,
+                l.admin_level_city,
+                l.admin_level_division,
+                l.site_category,
+                l.site_id,
+                l.site_name,
+                l.deployment_date,
+                
+                -- Latest readings
+                r.pm2_5,
+                r.pm10,
+                r.no2,
+                r.timestamp as reading_timestamp,
+                r.aqi_category,
+                r.aqi_color,
+                r.aqi_color_name,
+                
+                -- Latest status
+                st.is_online as current_is_online,
+                st.device_status as current_device_status,
+                st.timestamp as status_timestamp,
+                
+                -- Site information
+                s.site_name as full_site_name,
+                s.location_name as full_location_name,
+                s.search_name as full_search_name,
+                s.village as full_village,
+                s.town,
+                s.city,
+                s.district,
+                s.country,
+                s.data_provider,
+                s.site_category as full_site_category
+                
+            FROM dim_device d
+            LEFT JOIN dim_location l ON d.device_key = l.device_key AND l.is_active = true
+            LEFT JOIN latest_readings r ON d.device_key = r.device_key
+            LEFT JOIN latest_status st ON d.device_key = st.device_key
+            LEFT JOIN dim_site s ON r.site_key = s.site_key
+            WHERE d.device_id = :device_id
+        """)
+        
+        result = db.execute(query, {"device_id": device_id})
+        device_row = result.first()
+        
+        if not device_row:
+            raise HTTPException(status_code=404, detail=f"Device with ID {device_id} not found")
+        
+        # Convert row to dictionary
+        device_dict = dict(device_row._mapping)
+        
+        # Handle 'NaN' string values
+        for key, value in device_dict.items():
+            if isinstance(value, str) and value.lower() == 'nan':
+                device_dict[key] = None
+        
+        # Convert datetime objects and decimal values to JSON-serializable format
+        device_dict = convert_to_json_serializable(device_dict)
+        
+        # Get maintenance history if available
+        maintenance_history_query = text("""
+            WITH maintenance_entries AS (
+                SELECT 
+                    timestamp,
+                    CASE 
+                        WHEN LAG(is_online) OVER (ORDER BY timestamp) = false AND is_online = true THEN 'Restored'
+                        WHEN LAG(is_online) OVER (ORDER BY timestamp) = true AND is_online = false THEN 'Offline'
+                        WHEN LAG(device_status) OVER (ORDER BY timestamp) != device_status THEN 'Status Change'
+                        ELSE null
+                    END as maintenance_type,
+                    CASE 
+                        WHEN LAG(is_online) OVER (ORDER BY timestamp) = false AND is_online = true THEN 'Device came back online'
+                        WHEN LAG(is_online) OVER (ORDER BY timestamp) = true AND is_online = false THEN 'Device went offline'
+                        WHEN LAG(device_status) OVER (ORDER BY timestamp) != device_status THEN 'Status changed to ' || device_status
+                        ELSE null
+                    END as description
+                FROM fact_device_status
+                WHERE device_key = :device_key
+                ORDER BY timestamp DESC
+            )
+            SELECT 
+                timestamp,
+                maintenance_type,
+                description
+            FROM maintenance_entries
+            WHERE maintenance_type IS NOT NULL
+            LIMIT 10
+        """)
+        
+        history_result = db.execute(maintenance_history_query, {"device_key": device_dict['device_key']})
+        maintenance_history = []
+        
+        for row in history_result:
+            history_dict = dict(row._mapping)
+            history_dict = convert_to_json_serializable(history_dict)
+            maintenance_history.append(history_dict)
+        
+        # Get readings history
+        readings_history_query = text("""
+            SELECT 
+                timestamp,
+                pm2_5,
+                pm10,
+                no2,
+                aqi_category
+            FROM fact_device_readings
+            WHERE device_key = :device_key
+            ORDER BY timestamp DESC
+            LIMIT 20
+        """)
+        
+        readings_result = db.execute(readings_history_query, {"device_key": device_dict['device_key']})
+        readings_history = []
+        
+        for row in readings_result:
+            reading_dict = dict(row._mapping)
+            reading_dict = convert_to_json_serializable(reading_dict)
+            readings_history.append(reading_dict)
+        
+        # Structure the response in a more organized way
+        response = {
+            "device": {
+                "id": device_dict["device_id"],
+                "name": device_dict["device_name"],
+                "status": device_dict["status"],
+                "is_online": device_dict["current_is_online"],
+                "network": device_dict["network"],
+                "category": device_dict["category"],
+                "is_active": device_dict["is_active"],
+                "mount_type": device_dict["mount_type"],
+                "power_type": device_dict["power_type"],
+                "height": device_dict["height"],
+                "next_maintenance": device_dict["next_maintenance"],
+                "first_seen": device_dict["first_seen"],
+                "last_updated": device_dict["last_updated"]
+            },
+            "location": {
+                "latitude": device_dict["latitude"],
+                "longitude": device_dict["longitude"],
+                "name": device_dict["location_name"] or device_dict["full_location_name"],
+                "country": device_dict["admin_level_country"] or device_dict["country"],
+                "city": device_dict["admin_level_city"] or device_dict["city"],
+                "division": device_dict["admin_level_division"],
+                "village": device_dict["village"] or device_dict["full_village"],
+                "deployment_date": device_dict["deployment_date"]
+            },
+            "site": {
+                "id": device_dict["site_id"],
+                "name": device_dict["site_name"] or device_dict["full_site_name"],
+                "category": device_dict["site_category"] or device_dict["full_site_category"],
+                "data_provider": device_dict["data_provider"]
+            },
+            "latest_reading": {
+                "timestamp": device_dict["reading_timestamp"],
+                "pm2_5": device_dict["pm2_5"],
+                "pm10": device_dict["pm10"],
+                "no2": device_dict["no2"],
+                "aqi_category": device_dict["aqi_category"],
+                "aqi_color": device_dict["aqi_color"]
+            },
+            "maintenance_history": maintenance_history,
+            "readings_history": readings_history
+        }
+        
+        return create_json_response(response)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in get_device_detail: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch device details: {str(e)}")
