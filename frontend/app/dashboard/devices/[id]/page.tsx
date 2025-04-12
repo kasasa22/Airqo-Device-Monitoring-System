@@ -41,6 +41,8 @@ import {
 } from "lucide-react"
 import dynamic from "next/dynamic"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import HealthTipsSection from "@/components/health-tips-section";
+import DevicePerformanceMetrics from '@/components/DevicePerformanceMetrics';
 
 // API base URL - should be configured in your environment variables
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -94,6 +96,8 @@ export default function DeviceDetailPage() {
   const [showMap, setShowMap] = useState(false)
   const [dataTimeRange, setDataTimeRange] = useState("10days")
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [analysis, setAnalysis] = useState(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   
   // Generate sample historical data for charts
   const [historicalData, setHistoricalData] = useState(generateSampleData(10))
@@ -245,6 +249,104 @@ export default function DeviceDetailPage() {
     
     return location.length > 0 ? location.join(", ") : "Unknown location"
   }
+
+  // Function to generate AI analysis of device data transmission patterns
+  const generateDataTransmissionAnalysis = async () => {
+    if (!device?.readings_history || device.readings_history.length === 0) {
+      return "Insufficient data to generate analysis.";
+    }
+    
+    try {
+      // Group readings by date to identify data completeness patterns
+      const readingsByDate = {};
+      const expectedReadingsPerDay = 24; // Assuming hourly readings
+      
+      device.readings_history.forEach(reading => {
+        const date = reading.timestamp ? 
+          new Date(reading.timestamp).toISOString().split('T')[0] : 'Unknown';
+        
+        if (!readingsByDate[date]) {
+          readingsByDate[date] = { count: 0, date };
+        }
+        readingsByDate[date].count++;
+      });
+      
+      // Calculate transmission metrics
+      const dates = Object.keys(readingsByDate);
+      const dateCount = dates.length;
+      const totalReadings = device.readings_history.length;
+      const totalExpectedReadings = dateCount * expectedReadingsPerDay;
+      const completenessRate = ((totalReadings / totalExpectedReadings) * 100).toFixed(1);
+      
+      // Find gaps in transmission
+      const gapDays = [];
+      if (dates.length > 1) {
+        // Sort dates chronologically
+        dates.sort();
+        
+        // Check for missing days between first and last date
+        const startDate = new Date(dates[0]);
+        const endDate = new Date(dates[dates.length - 1]);
+        
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+          const dateStr = d.toISOString().split('T')[0];
+          if (!readingsByDate[dateStr]) {
+            gapDays.push(dateStr);
+          }
+        }
+      }
+      
+      // Create the prompt for OpenAI focusing on transmission patterns
+      const prompt = `
+      Analyze this device's data transmission patterns:
+      
+      Device: ${device.device?.name || "Unnamed Device"} (ID: ${device.device?.id})
+      Location: ${getLocationString()}
+      Date Range: ${dates[0]} to ${dates[dates.length - 1]}
+      Total Days with Data: ${dateCount} days
+      Total Readings Received: ${totalReadings}
+      Expected Readings Per Day: ${expectedReadingsPerDay}
+      Overall Data Completeness: ${completenessRate}%
+      Days with Missing Data: ${gapDays.length > 0 ? gapDays.join(', ') : "None"}
+      
+      Device Status: ${getDeviceStatus()}
+      Power Type: ${device.device?.power_type || "Unknown"}
+      Mount Type: ${device.device?.mount_type || "Unknown"}
+      Network: ${device.device?.network || "Unknown"}
+      
+      Provide a technical analysis focused on:
+      1. Data transmission reliability and patterns
+      2. Potential causes for any identified transmission gaps
+      3. Device connectivity health assessment
+      4. Recommendations for improving data collection reliability
+      5. Maintenance suggestions based on transmission patterns
+      
+      Format the analysis as bullet points for maintenance technicians.
+      Avoid discussing air quality measurements - focus only on the device's data transmission performance.
+      `;
+      
+      // Call our API route instead of OpenAI directly
+      const response = await fetch('/api/analyze-device', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data.analysis;
+      
+    } catch (error) {
+      console.error("Error generating analysis:", error);
+      return "Unable to generate device transmission analysis at this time. Please try again later.";
+    }
+  };
   
   // Sample failure and maintenance history
   const failureHistory = device?.maintenance_history || [
@@ -285,47 +387,41 @@ export default function DeviceDetailPage() {
   
   // Simplified chart rendering functions
   const renderDataTransmissionChart = () => {
-    // Generate some sample data for the chart or use API data if available
-    const dataTransmissionHistory = device?.readingsHistory || Array(10).fill().map((_, index) => {
-      const date = new Date()
-      date.setDate(date.getDate() - index)
-      const dateStr = date.toISOString().split('T')[0]
-      
-      // Random data with occasional missing or partial data
-      const rand = Math.random()
-      let status, dataPoints
-      
-      if (rand > 0.8) {
-        status = "missing"
-        dataPoints = 0
-      } else if (rand > 0.7) {
-        status = "partial"
-        dataPoints = Math.floor(Math.random() * 70) + 30
-      } else {
-        status = "complete"
-        dataPoints = 144
+    if (!device?.readings_history || device.readings_history.length === 0) {
+      return <div>No data available</div>;
+    }
+    
+    // Group readings by date to count how many readings were received per day
+    const readingsByDate = {};
+    device.readings_history.forEach(reading => {
+      const date = reading.timestamp ? new Date(reading.timestamp).toISOString().split('T')[0] : 'Unknown';
+      if (!readingsByDate[date]) {
+        readingsByDate[date] = { count: 0, date };
       }
-      
-      return {
-        date: dateStr,
-        status,
-        dataPoints,
-        expectedDataPoints: 144
-      }
-    }).reverse()
+      readingsByDate[date].count++;
+    });
+    
+    // Convert to array for chart and add expected count
+    const dataTransmissionStats = Object.values(readingsByDate).map(item => ({
+      ...item,
+      date: item.date,
+      dataPoints: item.count,
+      expectedDataPoints: 24 // Expected readings per day (e.g., hourly readings)
+    }));
     
     return (
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={dataTransmissionHistory}>
+        <BarChart data={dataTransmissionStats}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="date" />
           <YAxis />
           <Tooltip />
           <Legend />
-          <Bar dataKey="dataPoints" fill="#2196F3" name="Data Points Received" />
+          <Bar dataKey="dataPoints" fill="#2196F3" name="Readings Received" />
+          <Bar dataKey="expectedDataPoints" fill="#E0E0E0" name="Expected Readings" />
         </BarChart>
       </ResponsiveContainer>
-    )
+    );
   }
   
   const renderPerformanceChart = () => {
@@ -577,12 +673,10 @@ export default function DeviceDetailPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-5 mb-4">
+        <TabsList className="grid grid-cols-3 mb-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="data-transmission">Data Transmission</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -892,179 +986,65 @@ export default function DeviceDetailPage() {
                   </div>
                 )}
               </div>
+              {/* New AI Analysis section starts here */}
+              <div className="mt-6 border-t pt-6">
+                <h3 className="text-md font-medium mb-4 flex items-center">
+                  <Activity className="mr-2 h-5 w-5 text-primary" />
+                  Device Transmission Analysis
+                </h3>
+                
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  {analysisLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <RefreshCw className="h-8 w-8 text-primary animate-spin mb-2" />
+                      <p className="ml-2">Analyzing transmission patterns...</p>
+                    </div>
+                  ) : analysis ? (
+                    <div className="prose max-w-full space-y-2">
+                      <div dangerouslySetInnerHTML={{ __html: analysis.replace(/\n/g, '<br/>') }} />
+                      <div className="pt-4 border-t mt-4">
+                        <Button variant="outline" size="sm" onClick={() => setAnalysis(null)}>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Generate New Analysis
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8">
+                      <Button 
+                        onClick={() => {
+                          setAnalysisLoading(true);
+                          generateDataTransmissionAnalysis().then(result => {
+                            setAnalysis(result);
+                            setAnalysisLoading(false);
+                          });
+                        }}
+                      >
+                        Analyze Device Transmission
+                      </Button>
+                      <p className="text-sm text-gray-500 mt-2">Generate AI assessment of device connectivity and data reliability</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* New AI Analysis section ends here */}
             </CardContent>
             <CardFooter className="bg-gray-50 border-t px-4 py-3">
-              <Alert className="bg-yellow-50 border-yellow-200">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Data Transmission Analysis</AlertTitle>
-                <AlertDescription>
-                  <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
-                    <li>Some data points may be simulated for demonstration purposes</li>
-                    <li>Real data is shown when available from the device's history</li>
-                    <li>Overall data completeness is estimated based on recent API connectivity</li>
-                  </ul>
-                </AlertDescription>
-              </Alert>
+
+            <HealthTipsSection 
+            deviceId={device?.device?.id} 
+            readingKey={device?.latest_reading?.reading_key}
+            airQuality={device?.latest_reading?.aqi_category}
+          />
             </CardFooter>
           </Card>
         </TabsContent>
 
         <TabsContent value="performance" className="space-y-4">
-          <Card>
-            <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle className="text-lg">Device Performance History</CardTitle>
-                  <CardDescription>PM2.5 and PM10 readings over time</CardDescription>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <select className="border rounded-md p-2 text-sm">
-                    <option value="7days">Last 7 Days</option>
-                    <option value="30days">Last 30 Days</option>
-                    <option value="90days">Last 90 Days</option>
-                    <option value="custom">Custom Range</option>
-                  </select>
-                  <Button variant="outline" size="sm">
-                    <Download className="h-4 w-4 mr-1" />
-                    Export
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4">
-              <div className="h-80">{renderPerformanceChart()}</div>
-
-              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                <div className="flex items-center text-sm text-yellow-700">
-                  <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" />
-                  <span>
-                    This is a view-only demonstration. Settings changes will be implemented in a future version.
-                  </span>
-                </div>
-              </div>
-            
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Device Name</label>
-                    <input type="text" className="w-full p-2 border rounded-md" defaultValue={device.device?.name || "Unnamed Device"} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Location</label>
-                    <input type="text" className="w-full p-2 border rounded-md" defaultValue={getLocationString()} />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Status</label>
-                    <select className="w-full p-2 border rounded-md">
-                      <option value="deployed" selected={device.device?.status === "deployed"}>Deployed</option>
-                      <option value="not deployed" selected={device.device?.status === "not deployed"}>Not Deployed</option>
-                      <option value="recalled" selected={device.device?.status === "recalled"}>Recalled</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Category</label>
-                    <input type="text" className="w-full p-2 border rounded-md" defaultValue={device.device?.category || ""} />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Next Maintenance Date</label>
-                  <input 
-                    type="date" 
-                    className="w-full p-2 border rounded-md"
-                    defaultValue={device.device?.next_maintenance ? device.device.next_maintenance.split('T')[0] : ""} 
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Device Configuration</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Power Type</label>
-                      <select className="w-full p-2 border rounded-md" defaultValue={device.device?.power_type || ""}>
-                        <option value="">Select Power Type</option>
-                        <option value="solar">Solar</option>
-                        <option value="mains">Mains</option>
-                        <option value="battery">Battery</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Mount Type</label>
-                      <select className="w-full p-2 border rounded-md" defaultValue={device.device?.mount_type || ""}>
-                        <option value="">Select Mount Type</option>
-                        <option value="pole">Pole</option>
-                        <option value="wall">Wall</option>
-                        <option value="roof">Roof</option>
-                        <option value="street light">Street Light</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-1">Location Coordinates</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Latitude</label>
-                      <input 
-                        type="number" 
-                        step="0.000001"
-                        className="w-full p-2 border rounded-md" 
-                        defaultValue={device.location?.latitude || ""} 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Longitude</label>
-                      <input 
-                        type="number" 
-                        step="0.000001"
-                        className="w-full p-2 border rounded-md" 
-                        defaultValue={device.location?.longitude || ""} 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 flex justify-end space-x-2">
-                  <Button variant="outline">Cancel</Button>
-                  <Button>Save Changes</Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
-              <CardTitle className="text-lg flex items-center">
-                <Settings className="mr-2 h-5 w-5 text-primary" />
-                Advanced Settings
-              </CardTitle>
-              <CardDescription>Configuration options for advanced users</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4">
-              <div className="space-y-4">
-                <div className="p-4 border border-gray-200 rounded-lg">
-                  <h3 className="font-medium mb-2 flex items-center">
-                    <AlertTriangle className="mr-2 h-4 w-4 text-yellow-500" />
-                    Danger Zone
-                  </h3>
-                  <p className="text-sm text-gray-500 mb-4">
-                    These actions are irreversible and should be used with caution.
-                  </p>
-                  <div className="space-y-2">
-                    <Button variant="outline" className="w-full text-left justify-start border-red-200 text-red-600 hover:text-red-700 hover:bg-red-50">
-                      Reset Device Configuration
-                    </Button>
-                    <Button variant="outline" className="w-full text-left justify-start border-red-200 text-red-600 hover:text-red-700 hover:bg-red-50">
-                      Decommission Device
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <DevicePerformanceMetrics
+        deviceId={device?.device?.id}
+      />
+        
         </TabsContent>
       </Tabs>
     </div>
