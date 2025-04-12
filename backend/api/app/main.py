@@ -10,8 +10,13 @@ from datetime import datetime
 from decimal import Decimal
 import json
 import math
+import sys
+from app.device_performance_endpoint import router as performance_router, register_with_app
+
 
 app = FastAPI()
+
+register_with_app(app)
 
 # Custom JSON encoder to handle special values
 class CustomJSONEncoder(json.JSONEncoder):
@@ -139,6 +144,7 @@ def create_json_response(content):
     """Create a Response with properly encoded JSON content"""
     json_content = json.dumps(content, cls=CustomJSONEncoder)
     return Response(content=json_content, media_type="application/json")
+
 
 # Endpoint to get all devices
 @app.get("/devices")
@@ -814,3 +820,72 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
     except Exception as e:
         print(f"Error in get_device_detail: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch device details: {str(e)}")
+    
+@app.get("/health-tips/device/{device_id}")
+def get_health_tips_by_device(device_id: str, db=Depends(get_db)):
+    try:
+        # First get the device_key from the device_id
+        device_query = text("""
+            SELECT device_key FROM dim_device 
+            WHERE device_id = :device_id
+        """)
+        
+        device_result = db.execute(device_query, {"device_id": device_id})
+        device_row = device_result.first()
+        
+        if not device_row:
+            raise HTTPException(status_code=404, detail=f"Device with ID {device_id} not found")
+        
+        device_key = device_row[0]
+        
+        # Get the latest reading_key for this device
+        reading_query = text("""
+            SELECT reading_key, aqi_category
+            FROM fact_device_readings
+            WHERE device_key = :device_key
+            ORDER BY timestamp DESC
+            LIMIT 1
+        """)
+        
+        reading_result = db.execute(reading_query, {"device_key": device_key})
+        reading_row = reading_result.first()
+        
+        if not reading_row:
+            return {"tips": [], "message": "No readings found for this device"}
+        
+        reading_key = reading_row[0]
+        aqi_category = reading_row[1]
+        
+        # Get health tips associated with this reading
+        tips_query = text("""
+            SELECT 
+                tip_key,
+                tip_id,
+                title,
+                description,
+                image_url
+            FROM fact_health_tips
+            WHERE reading_key = :reading_key
+        """)
+        
+        tips_result = db.execute(tips_query, {"reading_key": reading_key})
+        tips = []
+        
+        for row in tips_result:
+            tip_dict = dict(row._mapping)
+            # Convert values to JSON-serializable format
+            tip_dict = convert_to_json_serializable(tip_dict)
+            tips.append(tip_dict)
+        
+        if not tips:
+            # No tips found for this specific reading_key
+            # Try to get general tips for this AQI category
+            return get_health_tips_by_category(aqi_category, db)
+        
+        return {"tips": tips, "aqi_category": aqi_category}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching health tips by device: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch health tips: {str(e)}")
