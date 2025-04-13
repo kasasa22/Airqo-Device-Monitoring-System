@@ -53,30 +53,89 @@ export default function UsersPage() {
     first_name: "",
     last_name: "",
     email: "",
+    phone: "",
     role: "",
     password: "",
     status: "active"
   })
+  const [error, setError] = useState<string | null>(null)
+
+  // Function to get auth token with proper error handling
+  const getAuthToken = () => {
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      throw new Error("Authentication token not found. Please log in again.")
+    }
+    return token
+  }
 
   const fetchUsers = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('access_token')
+      setError(null)
       
-      const response = await fetch('http://localhost:8000/users/', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      let token
+      try {
+        token = getAuthToken()
+      } catch (err: any) {
+        setError(err.message)
+        setLoading(false)
+        return
+      }
+      
+      // Try different authorization header formats
+      const headers = {
+        'Authorization': `Bearer ${token}`
+        // Some APIs might expect 'Token' instead of 'Bearer'
+        // Uncomment the line below if the API expects a different format
+        // 'Authorization': `Token ${token}`
+      }
+      
+      console.log("Fetching users with headers:", headers)
+      
+      const response = await fetch('http://localhost:8000/users/', { headers })
 
-      if (!response.ok) throw new Error('Failed to fetch users')
-      setUsers(await response.json())
-    } catch (error) {
+      if (response.status === 401 || response.status === 403) {
+        throw new Error("Could not validate credentials. Please log in again.")
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("API Error:", response.status, errorData)
+        throw new Error(errorData.detail || `Failed to fetch users: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log("Fetched users data:", data)
+      
+      // Handle different response formats
+      if (Array.isArray(data)) {
+        setUsers(data)
+      } else if (data.users && Array.isArray(data.users)) {
+        setUsers(data.users)
+      } else if (typeof data === 'object' && data !== null) {
+        // If the API returns an object with user data not in a 'users' property
+        // This handles cases where API might return {results: [...]} or other formats
+        const possibleArrayProps = Object.keys(data).find(key => Array.isArray(data[key]))
+        if (possibleArrayProps) {
+          setUsers(data[possibleArrayProps])
+        } else {
+          console.warn("Unexpected API response format:", data)
+          setUsers([])
+        }
+      } else {
+        console.error("Invalid API response format:", data)
+        throw new Error("Invalid response format from server")
+      }
+    } catch (error: any) {
+      console.error("Error fetching users:", error)
+      setError(error.message || "Failed to load users")
       toast({
         title: "Error",
-        description: "Failed to load users",
+        description: error.message || "Failed to load users",
         variant: "destructive",
       })
+      setUsers([])
     } finally {
       setLoading(false)
     }
@@ -84,7 +143,18 @@ export default function UsersPage() {
 
   const handleAddUser = async () => {
     try {
-      const token = localStorage.getItem('access_token')
+      let token
+      try {
+        token = getAuthToken()
+      } catch (err: any) {
+        toast({
+          title: "Error",
+          description: err.message,
+          variant: "destructive",
+        })
+        return
+      }
+      
       const response = await fetch('http://localhost:8000/users/', {
         method: 'POST',
         headers: {
@@ -94,9 +164,13 @@ export default function UsersPage() {
         body: JSON.stringify(newUser)
       })
 
+      if (response.status === 401 || response.status === 403) {
+        throw new Error("Could not validate credentials. Please log in again.")
+      }
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to add user')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `Failed to add user: ${response.status}`)
       }
 
       toast({
@@ -104,17 +178,47 @@ export default function UsersPage() {
         description: "User added successfully",
       })
       setIsDialogOpen(false)
-      fetchUsers() // Refresh the user list
+      setNewUser({
+        first_name: "",
+        last_name: "",
+        email: "",
+        phone: "",
+        role: "",
+        password: "",
+        status: "active"
+      })
+      fetchUsers()
     } catch (error: any) {
+      console.error("Error adding user:", error)
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to add user",
         variant: "destructive",
       })
     }
   }
 
-  useEffect(() => { fetchUsers() }, [])
+  const handleLogin = () => {
+    // Redirect to login page
+    window.location.href = '/login'
+  }
+
+  const handleCancel = () => {
+    setIsDialogOpen(false)
+    setNewUser({
+      first_name: "",
+      last_name: "",
+      email: "",
+      phone: "",
+      role: "",
+      password: "",
+      status: "active"
+    })
+  }
+
+  useEffect(() => { 
+    fetchUsers() 
+  }, [])
 
   const filteredUsers = users.filter(user => 
     `${user.first_name} ${user.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -138,6 +242,29 @@ export default function UsersPage() {
     )
   }
 
+  // Show authentication error with login button
+  if (error && error.includes("credentials")) {
+    return (
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Authentication Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 mb-4 text-red-700 bg-red-100 rounded-md">
+              <p>{error}</p>
+            </div>
+            <div className="flex justify-center mt-4">
+              <Button onClick={handleLogin}>
+                Log In Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto py-8">
       <Card>
@@ -154,6 +281,11 @@ export default function UsersPage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+              
+              <Button onClick={fetchUsers} variant="outline" className="mr-2">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh
+              </Button>
               
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
@@ -193,6 +325,16 @@ export default function UsersPage() {
                         onChange={(e) => setNewUser({...newUser, email: e.target.value})}
                       />
                     </div>
+
+                    <div className="space-y-2">
+                      <Label>Phone Number</Label>
+                      <Input 
+                        type="tel"
+                        value={newUser.phone}
+                        onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
+                        placeholder="Optional"
+                      />
+                    </div>
                     
                     <div className="space-y-2">
                       <Label>Password</Label>
@@ -223,13 +365,21 @@ export default function UsersPage() {
                     </div>
                   </div>
                   
-                  <Button 
-                    onClick={handleAddUser}
-                    disabled={!newUser.first_name || !newUser.last_name || 
-                              !newUser.email || !newUser.password || !newUser.role}
-                  >
-                    Add User
-                  </Button>
+                  <div className="flex justify-end gap-2">
+                    <Button 
+                      variant="outline"
+                      onClick={handleCancel}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleAddUser}
+                      disabled={!newUser.first_name || !newUser.last_name || 
+                                !newUser.email || !newUser.password || !newUser.role}
+                    >
+                      Add User
+                    </Button>
+                  </div>
                 </DialogContent>
               </Dialog>
             </div>
@@ -237,38 +387,51 @@ export default function UsersPage() {
         </CardHeader>
         
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Joined</TableHead>
-              </TableRow>
-            </TableHeader>
-            
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarFallback>
-                        {user.first_name[0]}{user.last_name[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span>{user.first_name} {user.last_name}</span>
-                  </TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell className="capitalize">{user.role.replace('_', ' ')}</TableCell>
-                  <TableCell>{getStatusBadge(user.status)}</TableCell>
-                  <TableCell>
-                    {new Date(user.created_at).toLocaleDateString()}
-                  </TableCell>
+          {error && !error.includes("credentials") ? (
+            <div className="p-4 mb-4 text-red-700 bg-red-100 rounded-md">
+              <p className="font-semibold">Error:</p>
+              <p>{error}</p>
+            </div>
+          ) : null}
+          
+          {users.length === 0 && !loading && !error ? (
+            <div className="py-6 text-center text-gray-500">
+              <p>No users found. Add users to populate this table.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Joined</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarFallback>
+                          {user.first_name[0]}{user.last_name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span>{user.first_name} {user.last_name}</span>
+                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell className="capitalize">{user.role.replace('_', ' ')}</TableCell>
+                    <TableCell>{getStatusBadge(user.status)}</TableCell>
+                    <TableCell>
+                      {new Date(user.created_at).toLocaleDateString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
