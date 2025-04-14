@@ -51,7 +51,7 @@ class CustomJSONEncoder(json.JSONEncoder):
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Your frontend URL
+    allow_origins=["http://localhost:3000"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -73,33 +73,36 @@ def get_db():
 
 # Helper function to convert values to JSON-serializable format
 def convert_to_json_serializable(item):
+    # Handle dictionary case
     if isinstance(item, dict):
         return {k: convert_to_json_serializable(v) for k, v in item.items()}
+    # Handle list case
     elif isinstance(item, list):
         return [convert_to_json_serializable(i) for i in item]
+    # Handle datetime
     elif isinstance(item, datetime):
         return item.isoformat()
+    # Handle Decimal
     elif isinstance(item, Decimal):
         try:
-            # Try to convert to float first
             float_val = float(item)
-            # Check for NaN, Infinity, -Infinity
             if math.isnan(float_val) or math.isinf(float_val):
                 return str(float_val)
             return float_val
         except (ValueError, OverflowError, TypeError):
-            # If conversion to float fails, return as string
             return str(item)
+    # Handle float
     elif isinstance(item, float):
-        # Handle NaN, Infinity, -Infinity for float values
         if math.isnan(item) or math.isinf(item):
             return str(item)
         return item
     # Handle string 'NaN' values
-    elif isinstance(item, str) and item.lower() == 'nan':
-        return None
+    elif isinstance(item, str):
+        if item.lower() == 'nan':
+            return None
+        return item
+    # Return any other type as is
     return item
-
 # Import for arbitrary type handling
 from pydantic import BaseModel, Field, Extra
 
@@ -341,16 +344,35 @@ def get_device_status(db=Depends(get_db)):
         
         status_counts = []
         for row in result:
-            status_dict = dict(row._mapping)
-            # Convert any decimal values
-            status_dict = convert_to_json_serializable(status_dict)
-            status_counts.append(status_dict)
+            try:
+                # Convert row to dictionary first
+                status_dict = dict(row._mapping)
+                
+                # Handle 'NaN' string values explicitly before conversion
+                for key, value in status_dict.items():
+                    if isinstance(value, str) and value.lower() == 'nan':
+                        status_dict[key] = None
+                
+                # Convert any decimal values with proper error handling
+                for key, value in status_dict.items():
+                    if isinstance(value, Decimal):
+                        try:
+                            status_dict[key] = float(value)
+                        except:
+                            status_dict[key] = str(value)
+                    elif isinstance(value, datetime):
+                        status_dict[key] = value.isoformat()
+                
+                status_counts.append(status_dict)
+                
+            except Exception as row_error:
+                print(f"Error processing status row: {str(row_error)}")
+                continue
             
         return create_json_response(status_counts)
     except Exception as e:
         print(f"Error in device status: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch device status: {str(e)}")
-
 # New endpoint to get device location data for mapping
 @app.get("/device-locations")
 def get_device_locations(db=Depends(get_db)):
@@ -515,7 +537,7 @@ def get_devices_simple(db=Depends(get_db)):
 @app.get("/valid-device-locations")
 def get_valid_device_locations(db=Depends(get_db)):
     try:
-        # Query that joins dim_device, dim_location, and latest readings with site information
+        # Query remains the same
         result = db.execute(text("""
             WITH latest_readings AS (
                 SELECT DISTINCT ON (device_key) 
@@ -566,38 +588,131 @@ def get_valid_device_locations(db=Depends(get_db)):
         device_locations = []
         for row in result:
             try:
-                location_dict = dict(row._mapping)
+                # Create a simple dictionary from the row
+                row_dict = {}
+                for column, value in row._mapping.items():
+                    row_dict[column] = value
                 
-                # Handle 'NaN' string values
-                for key, value in location_dict.items():
-                    if isinstance(value, str) and value.lower() == 'nan':
-                        location_dict[key] = None
+                # Process the data manually with explicit type checks
+                device_id = str(row_dict.get("device_id", "")) if row_dict.get("device_id") is not None else ""
+                device_name = str(row_dict.get("device_name", "")) if row_dict.get("device_name") is not None else ""
+                status = row_dict.get("status")
+                is_online = row_dict.get("is_online")
                 
-                # Convert datetime and decimal objects
-                location_dict = convert_to_json_serializable(location_dict)
+                # Handle numeric values that could be NaN
+                try:
+                    latitude = float(row_dict.get("latitude"))
+                    # Check if value is NaN and convert to null
+                    if math.isnan(latitude):
+                        latitude = None
+                except (TypeError, ValueError):
+                    latitude = None
+                    
+                try:
+                    longitude = float(row_dict.get("longitude"))
+                    # Check if value is NaN and convert to null
+                    if math.isnan(longitude):
+                        longitude = None
+                except (TypeError, ValueError):
+                    longitude = None
                 
-                # Format the response structure
+                # Only include rows with valid coordinates
+                if latitude is None or longitude is None:
+                    continue
+                
+                # Process PM values
+                try:
+                    pm2_5 = float(row_dict.get("pm2_5"))
+                    # Check if value is NaN
+                    if math.isnan(pm2_5):
+                        pm2_5 = None
+                except (TypeError, ValueError):
+                    pm2_5 = None
+                    
+                try:
+                    pm10 = float(row_dict.get("pm10"))
+                    # Check if value is NaN
+                    if math.isnan(pm10):
+                        pm10 = None
+                except (TypeError, ValueError):
+                    pm10 = None
+                
+                # Handle timestamp
+                reading_timestamp = None
+                if row_dict.get("reading_timestamp") is not None:
+                    if hasattr(row_dict["reading_timestamp"], "isoformat"):
+                        reading_timestamp = row_dict["reading_timestamp"].isoformat()
+                    else:
+                        reading_timestamp = str(row_dict["reading_timestamp"])
+                
+                # Build location object with careful null handling
+                location_name = row_dict.get("location_name")
+                if location_name is not None and isinstance(location_name, str) and location_name.lower() == 'nan':
+                    location_name = None
+                
+                admin_level_division = row_dict.get("admin_level_division")
+                if admin_level_division is not None and isinstance(admin_level_division, str) and admin_level_division.lower() == 'nan':
+                    admin_level_division = None
+                    
+                city = row_dict.get("city")
+                if city is not None and isinstance(city, str) and city.lower() == 'nan':
+                    city = None
+                
+                # Use the first non-null value
+                display_name = location_name
+                if display_name is None:
+                    display_name = admin_level_division
+                if display_name is None:
+                    display_name = city
+                if display_name is None:
+                    display_name = "Unknown Location"
+                
+                # Similarly handle country and city
+                admin_country = row_dict.get("admin_level_country")
+                if admin_country is not None and isinstance(admin_country, str) and admin_country.lower() == 'nan':
+                    admin_country = None
+                    
+                country = row_dict.get("country")
+                if country is not None and isinstance(country, str) and country.lower() == 'nan':
+                    country = None
+                
+                display_country = admin_country if admin_country is not None else country
+                
+                admin_city = row_dict.get("admin_level_city")
+                if admin_city is not None and isinstance(admin_city, str) and admin_city.lower() == 'nan':
+                    admin_city = None
+                
+                display_city = admin_city if admin_city is not None else city
+                
+                # Create the location object
                 formatted_location = {
-                    "id": location_dict["device_id"],
-                    "name": location_dict["device_name"],
-                    "status": "ACTIVE" if location_dict["status"] == "deployed" and location_dict["is_online"] else "INACTIVE",
-                    "latitude": location_dict["latitude"],
-                    "longitude": location_dict["longitude"],
-                    "pm2_5": location_dict.get("pm2_5"),
-                    "pm10": location_dict.get("pm10"),
-                    "reading_timestamp": location_dict.get("reading_timestamp"),
+                    "id": device_id,
+                    "name": device_name,
+                    "status": "ACTIVE" if status == "deployed" and is_online else "INACTIVE",
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "pm2_5": pm2_5,
+                    "pm10": pm10,
+                    "reading_timestamp": reading_timestamp,
                     "location": {
-                        "name": location_dict.get("location_name") or location_dict.get("admin_level_division") or location_dict.get("city"),
-                        "admin_level_country": location_dict.get("admin_level_country") or location_dict.get("country"),
-                        "admin_level_city": location_dict.get("admin_level_city") or location_dict.get("city"),
-                        "admin_level_division": location_dict.get("admin_level_division"),
-                        "village": location_dict.get("village"),
-                        "site_name": location_dict.get("site_name"),
-                        "site_category": location_dict.get("site_category"),
-                        "site_id": location_dict.get("site_id"),
-                        "data_provider": location_dict.get("data_provider")
+                        "name": display_name,
+                        "admin_level_country": display_country,
+                        "admin_level_city": display_city,
+                        "admin_level_division": admin_level_division,
+                        "village": row_dict.get("village"),
+                        "site_name": row_dict.get("site_name"),
+                        "site_category": row_dict.get("site_category"),
+                        "site_id": row_dict.get("site_id"),
+                        "data_provider": row_dict.get("data_provider")
                     }
                 }
+                
+                # Ensure no NaN values are in the JSON
+                for key, value in formatted_location["location"].items():
+                    if isinstance(value, float) and math.isnan(value):
+                        formatted_location["location"][key] = None
+                    elif isinstance(value, str) and value.lower() == 'nan':
+                        formatted_location["location"][key] = None
                 
                 device_locations.append(formatted_location)
                 
@@ -608,13 +723,24 @@ def get_valid_device_locations(db=Depends(get_db)):
         # Print diagnostics
         print(f"Retrieved {len(device_locations)} active and deployed device locations with valid coordinates")
             
-        return create_json_response(device_locations)
+        # Create a JSON response, being very careful to handle any unexpected values
+        def json_encoder(obj):
+            if isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            elif isinstance(obj, Decimal):
+                return float(obj)
+            elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+                return None
+            return str(obj)
+        
+        # Use the custom encoder to ensure valid JSON
+        json_content = json.dumps(device_locations, default=json_encoder)
+        return Response(content=json_content, media_type="application/json")
+    
     except Exception as e:
         print(f"Error in valid-device-locations endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch valid device locations: {str(e)}")
-
-     # my code that has my routes
-     # Create tables
+    
 models.Base.metadata.create_all(bind=database.engine)
 
 # JWT Configuration
@@ -887,18 +1013,41 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
         if not device_row:
             raise HTTPException(status_code=404, detail=f"Device with ID {device_id} not found")
         
-        # Convert row to dictionary
-        device_dict = dict(device_row._mapping)
-        
-        # Handle 'NaN' string values
-        for key, value in device_dict.items():
-            if isinstance(value, str) and value.lower() == 'nan':
+        # Directly convert row to dict without any type checking
+        raw_device_dict = {}
+        for column, value in device_row._mapping.items():
+            raw_device_dict[column] = value
+            
+        # Build a safe version of the device data
+        device_dict = {}
+        for key, value in raw_device_dict.items():
+            # Skip None values
+            if value is None:
                 device_dict[key] = None
+                continue
+                
+            # Handle different types without using isinstance
+            try:
+                # Try to convert to float (will work for Decimal and numeric types)
+                float_val = float(value)
+                # Check if NaN
+                if float_val != float_val:  # NaN check without math.isnan
+                    device_dict[key] = None
+                else:
+                    device_dict[key] = float_val
+            except (TypeError, ValueError):
+                # If conversion to float fails, try datetime
+                try:
+                    if hasattr(value, 'isoformat'):
+                        device_dict[key] = value.isoformat()
+                    else:
+                        # For strings and other types
+                        device_dict[key] = str(value)
+                except:
+                    # Last resort
+                    device_dict[key] = str(value)
         
-        # Convert datetime objects and decimal values to JSON-serializable format
-        device_dict = convert_to_json_serializable(device_dict)
-        
-        # Get maintenance history if available
+        # Get maintenance history
         maintenance_history_query = text("""
             WITH maintenance_entries AS (
                 SELECT 
@@ -928,12 +1077,37 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
             LIMIT 10
         """)
         
-        history_result = db.execute(maintenance_history_query, {"device_key": device_dict['device_key']})
+        history_result = db.execute(maintenance_history_query, {"device_key": raw_device_dict.get('device_key')})
         maintenance_history = []
         
         for row in history_result:
-            history_dict = dict(row._mapping)
-            history_dict = convert_to_json_serializable(history_dict)
+            # Convert each row to dict without type checking
+            raw_history_dict = {}
+            for column, value in row._mapping.items():
+                raw_history_dict[column] = value
+                
+            # Build a safe version
+            history_dict = {}
+            for key, value in raw_history_dict.items():
+                if value is None:
+                    history_dict[key] = None
+                    continue
+                    
+                try:
+                    float_val = float(value)
+                    if float_val != float_val:  # NaN check without math.isnan
+                        history_dict[key] = None
+                    else:
+                        history_dict[key] = float_val
+                except (TypeError, ValueError):
+                    try:
+                        if hasattr(value, 'isoformat'):
+                            history_dict[key] = value.isoformat()
+                        else:
+                            history_dict[key] = str(value)
+                    except:
+                        history_dict[key] = str(value)
+                        
             maintenance_history.append(history_dict)
         
         # Get readings history
@@ -950,67 +1124,117 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
             LIMIT 20
         """)
         
-        readings_result = db.execute(readings_history_query, {"device_key": device_dict['device_key']})
+        readings_result = db.execute(readings_history_query, {"device_key": raw_device_dict.get('device_key')})
         readings_history = []
         
         for row in readings_result:
-            reading_dict = dict(row._mapping)
-            reading_dict = convert_to_json_serializable(reading_dict)
+            # Convert each row to dict without type checking
+            raw_reading_dict = {}
+            for column, value in row._mapping.items():
+                raw_reading_dict[column] = value
+                
+            # Build a safe version
+            reading_dict = {}
+            for key, value in raw_reading_dict.items():
+                if value is None:
+                    reading_dict[key] = None
+                    continue
+                    
+                try:
+                    float_val = float(value)
+                    if float_val != float_val:  # NaN check without math.isnan
+                        reading_dict[key] = None
+                    else:
+                        reading_dict[key] = float_val
+                except (TypeError, ValueError):
+                    try:
+                        if hasattr(value, 'isoformat'):
+                            reading_dict[key] = value.isoformat()
+                        else:
+                            reading_dict[key] = str(value)
+                    except:
+                        reading_dict[key] = str(value)
+                        
             readings_history.append(reading_dict)
         
-        # Structure the response in a more organized way
+        # Structure the response with null checks
         response = {
             "device": {
-                "id": device_dict["device_id"],
-                "name": device_dict["device_name"],
-                "status": device_dict["status"],
-                "is_online": device_dict["current_is_online"],
-                "network": device_dict["network"],
-                "category": device_dict["category"],
-                "is_active": device_dict["is_active"],
-                "mount_type": device_dict["mount_type"],
-                "power_type": device_dict["power_type"],
-                "height": device_dict["height"],
-                "next_maintenance": device_dict["next_maintenance"],
-                "first_seen": device_dict["first_seen"],
-                "last_updated": device_dict["last_updated"]
+                "id": str(device_dict.get("device_id", "")) if device_dict.get("device_id") is not None else None,
+                "name": str(device_dict.get("device_name", "")) if device_dict.get("device_name") is not None else None,
+                "status": str(device_dict.get("status", "")) if device_dict.get("status") is not None else None,
+                "is_online": device_dict.get("current_is_online"),
+                "network": str(device_dict.get("network", "")) if device_dict.get("network") is not None else None,
+                "category": str(device_dict.get("category", "")) if device_dict.get("category") is not None else None,
+                "is_active": device_dict.get("is_active"),
+                "mount_type": str(device_dict.get("mount_type", "")) if device_dict.get("mount_type") is not None else None,
+                "power_type": str(device_dict.get("power_type", "")) if device_dict.get("power_type") is not None else None,
+                "height": device_dict.get("height"),
+                "next_maintenance": device_dict.get("next_maintenance"),
+                "first_seen": device_dict.get("first_seen"),
+                "last_updated": device_dict.get("last_updated")
             },
             "location": {
-                "latitude": device_dict["latitude"],
-                "longitude": device_dict["longitude"],
-                "name": device_dict["location_name"] or device_dict["full_location_name"],
-                "country": device_dict["admin_level_country"] or device_dict["country"],
-                "city": device_dict["admin_level_city"] or device_dict["city"],
-                "division": device_dict["admin_level_division"],
-                "village": device_dict["village"] or device_dict["full_village"],
-                "deployment_date": device_dict["deployment_date"]
+                "latitude": device_dict.get("latitude"),
+                "longitude": device_dict.get("longitude"),
+                "name": str(device_dict.get("location_name", "")) if device_dict.get("location_name") is not None else 
+                        (str(device_dict.get("full_location_name", "")) if device_dict.get("full_location_name") is not None else None),
+                "country": str(device_dict.get("admin_level_country", "")) if device_dict.get("admin_level_country") is not None else 
+                           (str(device_dict.get("country", "")) if device_dict.get("country") is not None else None),
+                "city": str(device_dict.get("admin_level_city", "")) if device_dict.get("admin_level_city") is not None else 
+                        (str(device_dict.get("city", "")) if device_dict.get("city") is not None else None),
+                "division": str(device_dict.get("admin_level_division", "")) if device_dict.get("admin_level_division") is not None else None,
+                "village": str(device_dict.get("village", "")) if device_dict.get("village") is not None else 
+                           (str(device_dict.get("full_village", "")) if device_dict.get("full_village") is not None else None),
+                "deployment_date": device_dict.get("deployment_date")
             },
             "site": {
-                "id": device_dict["site_id"],
-                "name": device_dict["site_name"] or device_dict["full_site_name"],
-                "category": device_dict["site_category"] or device_dict["full_site_category"],
-                "data_provider": device_dict["data_provider"]
+                "id": str(device_dict.get("site_id", "")) if device_dict.get("site_id") is not None else None,
+                "name": str(device_dict.get("site_name", "")) if device_dict.get("site_name") is not None else 
+                        (str(device_dict.get("full_site_name", "")) if device_dict.get("full_site_name") is not None else None),
+                "category": str(device_dict.get("site_category", "")) if device_dict.get("site_category") is not None else 
+                            (str(device_dict.get("full_site_category", "")) if device_dict.get("full_site_category") is not None else None),
+                "data_provider": str(device_dict.get("data_provider", "")) if device_dict.get("data_provider") is not None else None
             },
             "latest_reading": {
-                "timestamp": device_dict["reading_timestamp"],
-                "pm2_5": device_dict["pm2_5"],
-                "pm10": device_dict["pm10"],
-                "no2": device_dict["no2"],
-                "aqi_category": device_dict["aqi_category"],
-                "aqi_color": device_dict["aqi_color"]
+                "timestamp": device_dict.get("reading_timestamp"),
+                "pm2_5": device_dict.get("pm2_5"),
+                "pm10": device_dict.get("pm10"),
+                "no2": device_dict.get("no2"),
+                "aqi_category": str(device_dict.get("aqi_category", "")) if device_dict.get("aqi_category") is not None else None,
+                "aqi_color": str(device_dict.get("aqi_color", "")) if device_dict.get("aqi_color") is not None else None
             },
             "maintenance_history": maintenance_history,
             "readings_history": readings_history
         }
         
-        return create_json_response(response)
+        # Custom JSON encoder function without using isinstance
+        def safe_json_encoder(obj):
+            try:
+                # Try standard json serialization
+                json.dumps(obj)
+                return obj
+            except:
+                # If that fails, try to convert the object to a string
+                try:
+                    if hasattr(obj, 'isoformat'):  # Handle datetime objects
+                        return obj.isoformat()
+                    return str(obj)
+                except:
+                    return None
+        
+        # Use a simpler approach - convert to string first then parse back
+        json_str = json.dumps(response, default=safe_json_encoder)
+        safe_response = json.loads(json_str)
+        
+        return safe_response
         
     except HTTPException:
         raise
     except Exception as e:
         print(f"Error in get_device_detail: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch device details: {str(e)}")
-    
+        
 @app.get("/health-tips/device/{device_id}")
 def get_health_tips_by_device(device_id: str, db=Depends(get_db)):
     try:
@@ -1062,15 +1286,44 @@ def get_health_tips_by_device(device_id: str, db=Depends(get_db)):
         tips = []
         
         for row in tips_result:
-            tip_dict = dict(row._mapping)
-            # Convert values to JSON-serializable format
-            tip_dict = convert_to_json_serializable(tip_dict)
+            # Direct conversion without using convert_to_json_serializable
+            raw_tip_dict = {}
+            for column, value in row._mapping.items():
+                raw_tip_dict[column] = value
+            
+            # Process the tip data safely
+            tip_dict = {}
+            for key, value in raw_tip_dict.items():
+                if value is None:
+                    tip_dict[key] = None
+                    continue
+                
+                # Handle different types without using isinstance
+                try:
+                    # Try to convert to float (for numeric types)
+                    float_val = float(value)
+                    # Check if NaN
+                    if float_val != float_val:  # Simple NaN check
+                        tip_dict[key] = None
+                    else:
+                        tip_dict[key] = float_val
+                except (TypeError, ValueError):
+                    # For non-numeric types (strings, dates, etc.)
+                    try:
+                        if hasattr(value, 'isoformat'):
+                            tip_dict[key] = value.isoformat()
+                        else:
+                            tip_dict[key] = str(value)
+                    except:
+                        tip_dict[key] = str(value)
+            
             tips.append(tip_dict)
         
         if not tips:
             # No tips found for this specific reading_key
-            # Try to get general tips for this AQI category
-            return get_health_tips_by_category(aqi_category, db)
+            # Return a default set of health tips based on AQI category
+            default_tips = get_default_health_tips(aqi_category)
+            return {"tips": default_tips, "aqi_category": aqi_category}
         
         return {"tips": tips, "aqi_category": aqi_category}
         
@@ -1080,3 +1333,61 @@ def get_health_tips_by_device(device_id: str, db=Depends(get_db)):
         print(f"Error fetching health tips by device: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch health tips: {str(e)}")
 
+# Helper function to get default health tips based on AQI category
+def get_default_health_tips(aqi_category):
+    # Provide default health tips based on AQI category
+    if not aqi_category or aqi_category == "Unknown":
+        return [
+            {
+                "tip_id": "default-1",
+                "title": "Air Quality Information",
+                "description": "Stay informed about local air quality conditions through the AirQo app or website."
+            }
+        ]
+    
+    if aqi_category == "Good":
+        return [
+            {
+                "tip_id": "good-1",
+                "title": "Enjoy Outdoor Activities",
+                "description": "Air quality is good! This is a great time for outdoor activities."
+            },
+            {
+                "tip_id": "good-2",
+                "title": "Open Windows",
+                "description": "Take advantage of the clean air by opening windows to ventilate your home."
+            }
+        ]
+    
+    if aqi_category == "Moderate":
+        return [
+            {
+                "tip_id": "moderate-1",
+                "title": "Sensitive Groups Should Take Precautions",
+                "description": "If you have respiratory issues, consider reducing prolonged outdoor exertion."
+            },
+            {
+                "tip_id": "moderate-2",
+                "title": "Stay Hydrated",
+                "description": "Drink plenty of water to help your body process pollutants more effectively."
+            }
+        ]
+    
+    # For Unhealthy categories
+    return [
+        {
+            "tip_id": "unhealthy-1",
+            "title": "Limit Outdoor Activities",
+            "description": "Reduce time spent outdoors, especially near high-traffic areas."
+        },
+        {
+            "tip_id": "unhealthy-2",
+            "title": "Use Air Purifiers",
+            "description": "If available, use air purifiers indoors to improve indoor air quality."
+        },
+        {
+            "tip_id": "unhealthy-3",
+            "title": "Wear a Mask",
+            "description": "Consider wearing an N95 mask when outdoors if air quality is poor."
+        }
+    ]
