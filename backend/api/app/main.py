@@ -13,6 +13,7 @@ import json
 import math
 import sys
 from app.device_performance_endpoint import router as performance_router, register_with_app
+from app.site_performance_endpoint import router as site_router, register_with_app as register_site_endpoints
 
 
 from datetime import datetime, timedelta
@@ -33,6 +34,7 @@ app = FastAPI()
 
 
 register_with_app(app)
+register_site_endpoints(app)
 
 
 # Custom JSON encoder to handle special values
