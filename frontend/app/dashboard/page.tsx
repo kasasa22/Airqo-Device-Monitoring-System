@@ -46,7 +46,7 @@ import {
 import Link from "next/link"
 import dynamic from "next/dynamic"
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 
 // Dynamically import the map component
