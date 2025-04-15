@@ -318,5 +318,6 @@ services:
   
     command: npm run dev
     
+    
 volumes:
   postgres-db-volume:
