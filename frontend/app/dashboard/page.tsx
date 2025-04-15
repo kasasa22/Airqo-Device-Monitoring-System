@@ -45,8 +45,6 @@ import {
 } from "recharts"
 import Link from "next/link"
 import dynamic from "next/dynamic"
-import dotenv from 'dotenv';
-dotenv.config();
 
 
 // Dynamically import the map component
