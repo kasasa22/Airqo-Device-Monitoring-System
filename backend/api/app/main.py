@@ -50,10 +50,18 @@ class CustomJSONEncoder(json.JSONEncoder):
             return obj.isoformat()
         return super().default(obj)
 
-# Add CORS middleware
+# Add CORS middleware with updated configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], 
+    # Update to include both localhost and your VM hostname
+    allow_origins=[
+        "http://localhost:3000",
+        "http://srv792913.hstgr.cloud:3000",
+        # It's good practice to include HTTPS variants as well
+        "https://srv792913.hstgr.cloud:3000",
+        # You might also want to add a wildcard for all subdomains
+        "http://*.hstgr.cloud:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
