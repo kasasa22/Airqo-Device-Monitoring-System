@@ -4,17 +4,20 @@ FROM node:18
 # Set working directory
 WORKDIR /app
 
+# Install pnpm globally
+RUN npm install -g pnpm
+
 # Copy package.json and package-lock.json
 COPY package*.json ./
 
 # Install dependencies
 RUN npm install --legacy-peer-deps
 
+# Install TypeScript and required types
+RUN npm install --save-dev typescript @types/react @types/node
+
 # Copy the rest of the application code
 COPY . .
-
-# Install Next.js globally to ensure it's in the path
-RUN npm install -g next
 
 # Expose the development port
 EXPOSE 3000
