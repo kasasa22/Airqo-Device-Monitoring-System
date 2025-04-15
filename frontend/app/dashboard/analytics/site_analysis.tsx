@@ -36,7 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 
 // Define API base path with a fallback to localhost if env variable isn't set
-const apiBasePath = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const apiBasePath = process.env.NEXT_PUBLIC_API_URL 
 
 // AQI color mapping
 const aqiColors = {
