@@ -34,9 +34,9 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { config } from "@/lib/config"
 
-// Define API base path with a fallback to localhost if env variable isn't set
-const apiBasePath = process.env.NEXT_PUBLIC_API_URL 
+
 
 // AQI color mapping
 const aqiColors = {
@@ -61,7 +61,7 @@ export default function SiteAnalyticsPage() {
     const fetchLocations = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch(`${apiBasePath}/site-analytics/locations`)
+        const response = await fetch(`${config.apiUrl}/site-analytics/locations`)
         if (!response.ok) {
           throw new Error('Failed to fetch locations')
         }
@@ -107,7 +107,7 @@ export default function SiteAnalyticsPage() {
       
       try {
         // Make sure to include both the location ID and time range in the request
-        const response = await fetch(`${apiBasePath}/site-analytics/location/${selectedLocation}?time_range=${timeRange}`)
+        const response = await fetch(`${config.apiUrl}/site-analytics/location/${selectedLocation}?time_range=${timeRange}`)
         if (!response.ok) {
           throw new Error('Failed to fetch location data')
         }
@@ -131,7 +131,7 @@ export default function SiteAnalyticsPage() {
         setError(null)
         
         try {
-          const response = await fetch(`${apiBasePath}/site-analytics/locations/${selectedLocation}?time_range=${timeRange}`)
+          const response = await fetch(`${config.apiUrl}/site-analytics/locations/${selectedLocation}?time_range=${timeRange}`)
           if (!response.ok) {
             throw new Error('Failed to fetch location data')
           }

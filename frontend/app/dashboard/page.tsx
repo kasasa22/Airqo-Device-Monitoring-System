@@ -45,8 +45,7 @@ import {
 } from "recharts"
 import Link from "next/link"
 import dynamic from "next/dynamic"
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+import { config } from "@/lib/config"
 
 
 // Dynamically import the map component
@@ -137,7 +136,7 @@ export default function DashboardPage() {
   const fetchDeviceCounts = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${apiUrl}/device-counts`);
+      const response = await fetch(`${config.apiUrl}/device-counts`);
       
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
