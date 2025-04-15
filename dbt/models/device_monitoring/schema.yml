@@ -1,0 +1,37 @@
+# dbt/models/device_monitoring/schema.yml
+version: 2
+
+models:
+  - name: device_daily_metrics
+    description: "Daily aggregated metrics for each device"
+    columns:
+      - name: device_key
+        description: "Foreign key to the device dimension table"
+      - name: day
+        description: "Day of readings (truncated to day from timestamp)"
+      - name: reading_count
+        description: "Number of readings for the device on this day"
+      - name: avg_battery_voltage
+        description: "Average battery voltage for the day"
+      - name: min_battery_voltage
+        description: "Minimum battery voltage for the day"
+      - name: max_battery_voltage
+        description: "Maximum battery voltage for the day"
+      - name: avg_signal_strength
+        description: "Average signal strength in dBm for the day"
+  
+  - name: device_health_status
+    description: "Current health status of devices based on latest readings"
+    columns:
+      - name: device_key
+        description: "Foreign key to the device dimension table"
+      - name: device_name
+        description: "Name of the device"
+      - name: last_reading_time
+        description: "Timestamp of the most recent reading"
+      - name: battery_status
+        description: "Status of the battery (Good, Warning, Critical)"
+      - name: signal_status 
+        description: "Status of the signal strength (Good, Warning, Critical)"
+      - name: overall_status
+        description: "Overall device health status"
