@@ -134,7 +134,7 @@ export default function DashboardPage() {
   const fetchDeviceCounts = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:8000/device-counts');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/device-counts`);
       
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
