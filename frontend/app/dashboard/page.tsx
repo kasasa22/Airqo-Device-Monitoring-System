@@ -45,10 +45,11 @@ import {
 } from "recharts"
 import Link from "next/link"
 import dynamic from "next/dynamic"
+import { config } from "@/lib/config"
 
-const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-  (isDevelopment ? 'http://localhost:8000' : 'http://srv792913.hstgr.cloud:8000');
+// // const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+// const apiUrl = process.env.API_URL 
+//   // (isDevelopment ? 'http://localhost:8000' : 'http://srv792913.hstgr.cloud:8000');
 
 // Dynamically import the map component
 const AfricaMap = dynamic(() => import("./devices/africa-map"), {
@@ -138,7 +139,7 @@ export default function DashboardPage() {
   const fetchDeviceCounts = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${apiUrl}/device-counts`);
+      const response = await fetch(`${config.apiUrl}/device-counts`);
       
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
