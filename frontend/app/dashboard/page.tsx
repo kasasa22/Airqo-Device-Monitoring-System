@@ -46,8 +46,9 @@ import {
 import Link from "next/link"
 import dynamic from "next/dynamic"
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-console.log("API URL defined at module level:", apiUrl);
+const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 
+  (isDevelopment ? 'http://localhost:8000' : 'http://srv792913.hstgr.cloud:8000');
 
 // Dynamically import the map component
 const AfricaMap = dynamic(() => import("./devices/africa-map"), {
