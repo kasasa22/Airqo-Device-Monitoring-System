@@ -315,8 +315,7 @@ services:
       - API_URL=http://fastapi:8000
     depends_on:
       - fastapi
-    profiles:
-      - ui
+  
     command: npm run dev
     
 volumes:
