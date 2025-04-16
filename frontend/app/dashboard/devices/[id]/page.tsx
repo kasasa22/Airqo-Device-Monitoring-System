@@ -43,9 +43,9 @@ import dynamic from "next/dynamic"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import HealthTipsSection from "@/components/health-tips-section";
 import DevicePerformanceMetrics from '@/components/DevicePerformanceMetrics';
+import { config } from "@/lib/config"
 
-// API base URL - should be configured in your environment variables
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
 
 // Dynamically import the map component with no SSR
 const DeviceMap = dynamic(() => import("../device-map"), {
@@ -110,7 +110,7 @@ export default function DeviceDetailPage() {
       
       const deviceId = params.id
       // Use the new endpoint structure
-      const response = await fetch(`${API_BASE_URL}/device-detail/${deviceId}`)
+      const response = await fetch(`${config.apiUrl}/device-detail/${deviceId}`)
       
       if (!response.ok) {
         if (response.status === 404) {
