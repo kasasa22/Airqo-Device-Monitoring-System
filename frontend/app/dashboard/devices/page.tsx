@@ -28,9 +28,9 @@ import Link from "next/link"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import dynamic from "next/dynamic"
+import { config } from "@/lib/config"
 
-// API base URL - should be configured in your environment variables
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
 
 // Dynamically import the map component to avoid SSR issues
 const AfricaMap = dynamic(() => import("./africa-map"), {
@@ -73,7 +73,7 @@ export default function DevicesPage() {
   // Fetch device counts
   const fetchDeviceCounts = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/device-counts`)
+      const response = await fetch(`${config.apiUrl}/device-counts`)
       
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`)
@@ -94,7 +94,7 @@ export default function DevicesPage() {
       setError(null)
       
       // Use the valid-device-locations endpoint because it includes readings and locations
-      const response = await fetch(`${API_BASE_URL}/valid-device-locations`)
+      const response = await fetch(`${config.apiUrl}/valid-device-locations`)
       
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`)
