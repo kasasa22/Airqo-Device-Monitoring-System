@@ -5,6 +5,8 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Progress } from "@/components/ui/progress"
+import { HelpCircle, TrendingUp, TrendingDown, Wind, Thermometer } from "lucide-react"
 import {
   BarChart,
   Bar,
@@ -47,6 +49,15 @@ const aqiColors = {
   "very unhealthy": "#9C27B0",
   "hazardous": "#B71C1C"
 }
+
+
+const formatNumber = (value, decimals = 1) => {
+    // Check if value is null, undefined, or not a number
+    if (value === null || value === undefined || isNaN(Number(value))) {
+      return "N/A";
+    }
+    return Number(value).toFixed(decimals) + " μg/m³";
+  };
 
 export default function SiteAnalyticsPage() {
   const [timeRange, setTimeRange] = useState("week")
@@ -408,9 +419,408 @@ export default function SiteAnalyticsPage() {
               <TabsTrigger value="devices">Device Details</TabsTrigger>
               <TabsTrigger value="time-series">Time Series</TabsTrigger>
             </TabsList>
+            <TabsContent value="overview" className="space-y-4">
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <Info className="mr-2 h-5 w-5 text-primary" />
+          Site Summary
+        </CardTitle>
+        <CardDescription>Overview of monitoring sites in {locationData.location.display_name || locationData.location.country}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">Total Sites</span>
+            <span className="font-bold">{locationData.metrics.total_sites || 0}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">Active Sites</span>
+            <span className="font-bold">{locationData.time_series && locationData.time_series.length > 0 
+              ? locationData.time_series[locationData.time_series.length - 1].active_sites || 0
+              : 0}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">Data Completeness</span>
+            <span className="font-bold">{locationData.metrics.avg_data_completeness 
+              ? Math.round(locationData.metrics.avg_data_completeness) + '%' 
+              : 'N/A'}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">Average Uptime</span>
+            <span className="font-bold">{locationData.time_series && locationData.time_series.length > 0 
+              ? `${Math.round(locationData.time_series[locationData.time_series.length - 1].uptime || 0)}%`
+              : 'N/A'}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
 
-            {/* Tab contents remain the same */}
-            {/* ... */}
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <Activity className="mr-2 h-5 w-5 text-primary" />
+          Air Quality Overview
+        </CardTitle>
+        <CardDescription>Current air quality status across sites</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium">Average PM2.5</span>
+              <span className="font-bold">{locationData.metrics.avg_pm25 
+                ? `${locationData.metrics.avg_pm25.toFixed(1)} μg/m³` 
+                : 'N/A'}</span>
+            </div>
+            <Progress 
+              value={locationData.metrics.avg_pm25 ? Math.min(100, (locationData.metrics.avg_pm25 / 50) * 100) : 0} 
+              className="h-2" 
+            />
+          </div>
+          
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium">Average PM10</span>
+              <span className="font-bold">{locationData.metrics.avg_pm10
+                ? `${locationData.metrics.avg_pm10.toFixed(1)} μg/m³`
+                : 'N/A'}</span>
+            </div>
+            <Progress 
+              value={locationData.metrics.avg_pm10 ? Math.min(100, (locationData.metrics.avg_pm10 / 100) * 100) : 0} 
+              className="h-2" 
+            />
+          </div>
+          
+          <div className="pt-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">Predominant AQI Category</span>
+              {locationData.aqi_distribution && Object.keys(locationData.aqi_distribution).length > 0 ? (
+                <Badge 
+                  style={{ 
+                    backgroundColor: aqiColors[getPredominantAqiCategory(locationData.aqi_distribution).toLowerCase()] || "#888",
+                    color: "#fff" 
+                  }}
+                >
+                  {getPredominantAqiCategory(locationData.aqi_distribution)}
+                </Badge>
+              ) : (
+                <span>N/A</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center">
+        <TrendingUp className="mr-2 h-5 w-5 text-primary" />
+        PM2.5 Trends
+      </CardTitle>
+      <CardDescription>Average PM2.5 readings over time</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <div className="h-80">
+        {locationData.time_series && locationData.time_series.length > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={locationData.time_series}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="reading_date" 
+                tickFormatter={(value) => new Date(value).toLocaleDateString()} 
+              />
+              <YAxis />
+              <Tooltip 
+                labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                formatter={(value) => [`${value.toFixed(1)} μg/m³`, "Avg PM2.5"]}
+              />
+              <Legend />
+              <Line 
+                type="monotone" 
+                dataKey="avg_pm25" 
+                name="Average PM2.5" 
+                stroke="#8884d8" 
+                activeDot={{ r: 8 }} 
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">No PM2.5 trend data available</p>
+          </div>
+        )}
+      </div>
+    </CardContent>
+  </Card>
+
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center">
+        <MapPin className="mr-2 h-5 w-5 text-primary" />
+        Top Sites by Data Completeness
+      </CardTitle>
+      <CardDescription>Sites with the highest data completeness percentage</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <div className="h-80">
+        {locationData.sites && locationData.sites.length > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart 
+              data={locationData.sites
+                .filter(site => site.data_completeness !== undefined && site.data_completeness !== null)
+                .sort((a, b) => (b.data_completeness || 0) - (a.data_completeness || 0))
+                .slice(0, 10)
+              }
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="site_name" 
+                tick={{ fontSize: 12 }}
+                interval={0}
+                tickFormatter={(value) => value && value.length > 10 ? `${value.substring(0, 10)}...` : value}
+              />
+              <YAxis domain={[0, 100]} />
+              <Tooltip />
+              <Legend />
+              <Bar 
+                dataKey="data_completeness" 
+                name="Data Completeness (%)" 
+                fill="#82ca9d" 
+                radius={[4, 4, 0, 0]}
+                label={{ position: 'top', formatter: (value) => `${Math.round(value)}%`, fontSize: 12 }}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">No site data available</p>
+          </div>
+        )}
+      </div>
+    </CardContent>
+  </Card>
+</TabsContent>
+
+<TabsContent value="air-quality" className="space-y-4">
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <Activity className="mr-2 h-5 w-5 text-primary" />
+          AQI Distribution
+        </CardTitle>
+        <CardDescription>Distribution of AQI categories across all sites</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="h-80">
+          {locationData.aqi_distribution && Object.keys(locationData.aqi_distribution).length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={formatAqiDistributionForChart(locationData.aqi_distribution)}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={true}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                  nameKey="name"
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                >
+                  {formatAqiDistributionForChart(locationData.aqi_distribution).map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => [`${value} sites`, "Count"]} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">No AQI distribution data available</p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <TrendingUp className="mr-2 h-5 w-5 text-primary" />
+          PM10 vs PM2.5 Comparison
+        </CardTitle>
+        <CardDescription>Comparison of PM10 and PM2.5 levels over time</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="h-80">
+          {locationData.time_series && locationData.time_series.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={locationData.time_series}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="reading_date" 
+                  tickFormatter={(value) => new Date(value).toLocaleDateString()} 
+                />
+                <YAxis />
+                <Tooltip 
+                  labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                  formatter={(value, name) => [`${value.toFixed(1)} μg/m³`, name]}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="avg_pm25" 
+                  name="PM2.5" 
+                  stroke="#8884d8" 
+                  strokeWidth={2}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="avg_pm10" 
+                  name="PM10" 
+                  stroke="#82ca9d" 
+                  strokeWidth={2}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">No PM comparison data available</p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center">
+        <AlertTriangle className="mr-2 h-5 w-5 text-primary" />
+        Sites Exceeding WHO Guidelines
+      </CardTitle>
+      <CardDescription>Sites with PM2.5 or PM10 levels exceeding WHO guidelines</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="bg-gray-50">
+              <th className="text-left py-3 px-4 font-medium text-gray-600">Site Name</th>
+              <th className="text-left py-3 px-4 font-medium text-gray-600">Latest PM2.5</th>
+              <th className="text-left py-3 px-4 font-medium text-gray-600">WHO Guideline PM2.5</th>
+              <th className="text-left py-3 px-4 font-medium text-gray-600">Latest PM10</th>
+              <th className="text-left py-3 px-4 font-medium text-gray-600">WHO Guideline PM10</th>
+              <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {locationData.sites && locationData.sites
+              .filter(site => (
+                (site.latest_pm2_5 !== null && site.latest_pm2_5 !== undefined && site.latest_pm2_5 > 15) || 
+                (site.latest_pm10 !== null && site.latest_pm10 !== undefined && site.latest_pm10 > 45)
+              ))
+              .map((site, index) => (
+                <tr 
+                  key={`who-${site.site_id}_${index}`}
+                  className={`border-b hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                >
+                  <td className="py-3 px-4 font-medium">{site.site_name || site.site_id}</td>
+                  <td className="py-3 px-4 font-medium">
+                    {formatNumber(site.latest_pm2_5)}
+                  </td>
+                  <td className="py-3 px-4">15.0 μg/m³</td>
+                  <td className="py-3 px-4 font-medium">
+                    {formatNumber(site.latest_pm10)}
+                  </td>
+                  <td className="py-3 px-4">45.0 μg/m³</td>
+                  <td className="py-3 px-4">
+                    <Badge 
+                      variant={
+                        (site.latest_pm2_5 > 30 || site.latest_pm10 > 90) ? "destructive" : 
+                        (site.latest_pm2_5 > 15 || site.latest_pm10 > 45) ? "warning" : "outline"
+                      }
+                    >
+                      {(site.latest_pm2_5 > 30 || site.latest_pm10 > 90) ? "Significantly Exceeding" : "Exceeding"}
+                    </Badge>
+                  </td>
+                </tr>
+            ))}
+            {!locationData.sites || 
+             !locationData.sites.some(site => 
+               (site.latest_pm2_5 !== null && site.latest_pm2_5 !== undefined && site.latest_pm2_5 > 15) || 
+               (site.latest_pm10 !== null && site.latest_pm10 !== undefined && site.latest_pm10 > 45)
+             ) ? (
+              <tr>
+                <td colSpan="6" className="py-4 text-center text-muted-foreground">
+                  No sites exceeding WHO guidelines
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </CardContent>
+  </Card>
+
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center">
+        <HelpCircle className="mr-2 h-5 w-5 text-primary" />
+        Air Quality Insights
+      </CardTitle>
+      <CardDescription>Key insights about air quality in this location</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-4">
+        {/* Calculate insights from the data */}
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Average AQI Category</AlertTitle>
+          <AlertDescription>
+            The predominant air quality category in {locationData.location.display_name || locationData.location.country} is{" "}
+            <span className="font-bold" style={{ color: aqiColors[getPredominantAqiCategory(locationData.aqi_distribution).toLowerCase()] || "#888" }}>
+              {getPredominantAqiCategory(locationData.aqi_distribution)}
+            </span>
+          </AlertDescription>
+        </Alert>
+
+        {locationData.time_series && locationData.time_series.length > 1 && (
+          <Alert variant={isPm25Increasing(locationData.time_series) ? "destructive" : "default"}>
+            {isPm25Increasing(locationData.time_series) ? (
+              <TrendingUp className="h-4 w-4" />
+            ) : (
+              <TrendingDown className="h-4 w-4" />
+            )}
+            <AlertTitle>PM2.5 Trend</AlertTitle>
+            <AlertDescription>
+              PM2.5 levels are {isPm25Increasing(locationData.time_series) ? "increasing" : "decreasing"} over the selected time period. 
+              {isPm25Increasing(locationData.time_series) 
+                ? " This could indicate worsening air quality conditions." 
+                : " This indicates improving air quality conditions."}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <Alert variant={getHighestPmRatio(locationData.sites) > 2.5 ? "warning" : "default"}>
+          <Wind className="h-4 w-4" />
+          <AlertTitle>PM10/PM2.5 Ratio</AlertTitle>
+          <AlertDescription>
+            The highest PM10/PM2.5 ratio is {getHighestPmRatio(locationData.sites).toFixed(1)} at site {getHighestPmRatioSiteName(locationData.sites)}.
+            {getHighestPmRatio(locationData.sites) > 2.5 
+              ? " High ratios may indicate significant coarse particle pollution sources such as dust, construction, or road traffic." 
+              : " This ratio is within normal levels, suggesting a balanced mix of fine and coarse particles."}
+          </AlertDescription>
+        </Alert>
+      </div>
+    </CardContent>
+  </Card>
+</TabsContent>
             
             <TabsContent value="devices" className="space-y-4">
               <Card>
@@ -444,11 +854,11 @@ export default function SiteAnalyticsPage() {
                               <td className="py-3 px-4 font-medium">{site.site_name || site.site_id}</td>
                               <td className="py-3 px-4">{site.location_name || `${site.city || site.district || site.country}`}</td>
                               <td className="py-3 px-4">
-                                {site.latest_pm2_5 !== undefined ? `${site.latest_pm2_5.toFixed(1)} μg/m³` : "N/A"}
-                              </td>
-                              <td className="py-3 px-4">
-                                {site.latest_pm10 !== undefined ? `${site.latest_pm10.toFixed(1)} μg/m³` : "N/A"}
-                              </td>
+                              {formatNumber(site.latest_pm2_5)}
+                            </td>
+                            <td className="py-3 px-4">
+                              {formatNumber(site.latest_pm10)}
+                            </td>
                               <td className="py-3 px-4">
                                 {site.last_reading_time ? new Date(site.last_reading_time).toLocaleString() : "N/A"}
                               </td>
@@ -533,3 +943,88 @@ export default function SiteAnalyticsPage() {
     </div>
   )
 }
+
+
+
+
+// Function to determine the predominant AQI category
+function getPredominantAqiCategory(aqiDistribution) {
+    if (!aqiDistribution) return "Unknown";
+    
+    // Find the category with the highest count
+    let maxCount = 0;
+    let predominantCategory = "Unknown";
+    
+    const categories = {
+      "good": aqiDistribution.good || 0,
+      "moderate": aqiDistribution.moderate || 0,
+      "unhealthy for sensitive groups": aqiDistribution.unhealthy_sensitive || 0,
+      "unhealthy": aqiDistribution.unhealthy || 0,
+      "very unhealthy": aqiDistribution.very_unhealthy || 0,
+      "hazardous": aqiDistribution.hazardous || 0
+    };
+    
+    for (const [category, count] of Object.entries(categories)) {
+      if (count > maxCount) {
+        maxCount = count;
+        predominantCategory = category.charAt(0).toUpperCase() + category.slice(1);
+      }
+    }
+    
+    return predominantCategory;
+  }
+  
+  // Function to determine if PM2.5 levels are increasing
+  function isPm25Increasing(timeSeriesData) {
+    if (!timeSeriesData || timeSeriesData.length < 2) return false;
+    
+    // Get the first and last valid readings
+    const validReadings = timeSeriesData.filter(reading => 
+      reading.avg_pm25 !== null && reading.avg_pm25 !== undefined
+    );
+    
+    if (validReadings.length < 2) return false;
+    
+    const firstReading = validReadings[0];
+    const lastReading = validReadings[validReadings.length - 1];
+    
+    return lastReading.avg_pm25 > firstReading.avg_pm25;
+  }
+  
+  // Function to calculate the highest PM10/PM2.5 ratio
+  function getHighestPmRatio(sites) {
+    if (!sites || sites.length === 0) return 1;
+    
+    let highestRatio = 0;
+    
+    sites.forEach(site => {
+      if (site.latest_pm2_5 && site.latest_pm10 && site.latest_pm2_5 > 0) {
+        const ratio = site.latest_pm10 / site.latest_pm2_5;
+        if (ratio > highestRatio) {
+          highestRatio = ratio;
+        }
+      }
+    });
+    
+    return highestRatio || 1;
+  }
+  
+  // Function to get the site name with the highest ratio
+  function getHighestPmRatioSiteName(sites) {
+    if (!sites || sites.length === 0) return "Unknown";
+    
+    let highestRatio = 0;
+    let siteName = "Unknown";
+    
+    sites.forEach(site => {
+      if (site.latest_pm2_5 && site.latest_pm10 && site.latest_pm2_5 > 0) {
+        const ratio = site.latest_pm10 / site.latest_pm2_5;
+        if (ratio > highestRatio) {
+          highestRatio = ratio;
+          siteName = site.site_name || site.site_id || "Unknown";
+        }
+      }
+    });
+    
+    return siteName;
+  }
