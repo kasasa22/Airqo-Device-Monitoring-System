@@ -28,7 +28,7 @@ from jose import JWTError, jwt
 import datetime
 
 from . import database
-
+from app.superAdmin import create_super_admin
 from . import models, schemas
 app = FastAPI()
 
@@ -750,7 +750,13 @@ def get_valid_device_locations(db=Depends(get_db)):
     except Exception as e:
         print(f"Error in valid-device-locations endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch valid device locations: {str(e)}")
-    
+     
+     
+     
+     
+     
+     # my code that has my routes
+# Create tables if they don't exist
 models.Base.metadata.create_all(bind=database.engine)
 
 # JWT Configuration
@@ -758,16 +764,18 @@ SECRET_KEY = "your-secret-key-change-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # OAuth2 setup
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-# Enable CORS
+# Ensure Super Admin exists during app startup
+@app.on_event("startup")
+async def on_startup():
+    create_super_admin()  # No need to pass db since it's created inside the function
 
-
+# Password verification and hashing functions
 def verify_password(plain_password: str, hashed_password: str):
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -783,6 +791,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+# Get current user from the JWT token
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -802,49 +811,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         raise credentials_exception
     return user
 
-
-
-class AdminCreateRequest(BaseModel):
-    email: EmailStr
-    password: str
-    first_name: str
-    last_name: str
-
-@app.post("/create-admin")
-def create_admin(admin: AdminCreateRequest, db: Session = Depends(database.get_db)):
-    existing_admin = db.query(models.User).filter(models.User.email == admin.email).first()
-    
-    if existing_admin:
-        raise HTTPException(status_code=400, detail="Admin user already exists")
-    
-    admin_user = models.User(
-        email=admin.email,
-        password_hash=get_password_hash(admin.password),
-        first_name=admin.first_name,
-        last_name=admin.last_name,
-        role="admin",
-        status="active",
-        created_at=datetime.datetime.utcnow(),
-        updated_at=datetime.datetime.utcnow()
-    )
-    
-    db.add(admin_user)
-    db.commit()
-    
-    return {
-        "message": "Admin user created successfully",
-        "email": admin.email
-    }
-
-
-
+# User login route
 @app.post("/login")
-
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
-
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
-    print(f"Logging in user: {user.email}")
-
     if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -870,34 +840,18 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         }
     }
 
-# User management endpoints
-@app.get("/users/", response_model=List[schemas.User])
-def get_users(
-    skip: int = 0,
-    limit: int = Query(100, le=100),
-    db: Session = Depends(database.get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    """Get all users (admin only)"""
-    if current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admin users can access this endpoint"
-        )
-    users = db.query(models.User).offset(skip).limit(limit).all()
-    return users
-
+# User management routes (Super Admin can create other users)
 @app.post("/users/", response_model=schemas.User)
 def create_user(
     user: schemas.UserCreate,
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """Create a new user (admin only)"""
-    if current_user.role != "admin":
+    """Create a new user (Only Super Admin can access this endpoint)"""
+    if current_user.role != "superadmin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admin users can access this endpoint"
+            detail="Only superadmin can create new users"
         )
     
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
