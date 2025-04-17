@@ -13,91 +13,70 @@ router = APIRouter(prefix="/api/analytics", tags=["data-analytics"])
 
 @router.get("/device-transmission")
 def get_device_transmission(
-    timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
     db: Session = Depends(get_db)
-):
-    """
-    Get data transmission status by device over time.
-    Returns a time series showing when devices successfully transmitted data.
-    """
+) -> Dict[str, Any]:
     try:
-        # Determine time interval
-        end_date = datetime.now()
-        if timeRange == "7days":
-            start_date = end_date - timedelta(days=7)
-            interval = "day"
-        elif timeRange == "30days":
-            start_date = end_date - timedelta(days=30)
-            interval = "day"
-        elif timeRange == "90days":
-            start_date = end_date - timedelta(days=90)
-            interval = "week"
-        elif timeRange == "year":
-            start_date = end_date - timedelta(days=365)
-            interval = "month"
-        else:
-            start_date = end_date - timedelta(days=7)
-            interval = "day"
+        # Use default date range of 7 days if not provided
+        if not start_date or not end_date:
+            end_date = datetime.utcnow()
+            start_date = end_date - timedelta(days=6)
 
-        query = text(f"""
+        query = text("""
             WITH date_series AS (
                 SELECT generate_series(
-                    DATE_TRUNC('{interval}', CAST(:start_date AS TIMESTAMP))::date,
-                    DATE_TRUNC('{interval}', CAST(:end_date AS TIMESTAMP))::date,
-                    INTERVAL '1 {interval}'
+                    DATE_TRUNC('day', CAST(:start_date AS TIMESTAMP))::date,
+                    DATE_TRUNC('day', CAST(:end_date AS TIMESTAMP))::date,
+                    INTERVAL '1 day'
                 ) AS date
             ),
             active_devices AS (
-                SELECT DISTINCT device_id
+                SELECT DISTINCT device_id, device_key
                 FROM dim_device
                 WHERE is_active = true AND status = 'deployed'
             ),
-            device_transmission AS (
+            device_dates AS (
                 SELECT 
-                    DATE_TRUNC('{interval}', r.timestamp)::date AS date,
-                    d.device_id,
-                    COUNT(r.reading_key) > 0 AS has_data
-                FROM dim_device d
-                CROSS JOIN date_series ds
-                LEFT JOIN fact_device_readings r 
-                    ON d.device_key = r.device_key 
-                    AND DATE_TRUNC('{interval}', r.timestamp)::date = ds.date
-                WHERE d.device_id IN (SELECT device_id FROM active_devices)
-                GROUP BY d.device_id, DATE_TRUNC('{interval}', r.timestamp)::date, ds.date
+                    ds.date, 
+                    ad.device_id, 
+                    ad.device_key
+                FROM date_series ds
+                CROSS JOIN active_devices ad
+            ),
+            readings_per_day AS (
+                SELECT 
+                    DATE_TRUNC('day', r.timestamp)::date AS reading_date,
+                    r.device_key,
+                    COUNT(*) AS reading_count
+                FROM fact_device_readings r
+                GROUP BY DATE_TRUNC('day', r.timestamp)::date, r.device_key
             )
             SELECT 
-                ds.date::text,
+                dd.date::text,
                 json_object_agg(
-                    dt.device_id, 
-                    CASE WHEN dt.has_data THEN 100 ELSE 0 END
-                ) FILTER (WHERE dt.device_id IS NOT NULL) AS device_data
-            FROM date_series ds
-            CROSS JOIN active_devices ad
-            LEFT JOIN device_transmission dt 
-                ON ds.date = dt.date AND ad.device_id = dt.device_id
-            GROUP BY ds.date
-            ORDER BY ds.date;
+                    dd.device_id, 
+                    CASE WHEN rpd.reading_count > 0 THEN 100 ELSE 0 END
+                ) AS device_data
+            FROM device_dates dd
+            LEFT JOIN readings_per_day rpd
+                ON dd.device_key = rpd.device_key AND dd.date = rpd.reading_date
+            GROUP BY dd.date
+            ORDER BY dd.date;
         """)
 
-        result = db.execute(query, {
-            "start_date": start_date,
-            "end_date": end_date
-        })
+        result = db.execute(query, {"start_date": start_date, "end_date": end_date}).fetchall()
 
-        transmission_data = []
-        for row in result:
-            date_str = row[0]
-            device_data = row[1] or {}
-            row_data = {"date": date_str}
-            if isinstance(device_data, dict):
-                row_data.update(device_data)
-            transmission_data.append(row_data)
+        # Transform result into JSON serializable response
+        transmission_data = [
+            {"date": row["date"], "device_data": row["device_data"]}
+            for row in result
+        ]
 
-        return create_json_response(transmission_data)
+        return transmission_data
 
     except Exception as e:
-        print(f"Error in get_device_transmission: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch device transmission data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch device transmission data: {e}")
     
 @router.get("/data-volume")
 def get_data_volume(
