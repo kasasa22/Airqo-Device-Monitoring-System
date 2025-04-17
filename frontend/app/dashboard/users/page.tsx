@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { config } from "@/lib/config"
 
 interface User {
   id: number
@@ -93,7 +94,7 @@ export default function UsersPage() {
       
       console.log("Fetching users with headers:", headers)
       
-      const response = await fetch('http://localhost:8000/users/', { headers })
+      const response = await fetch(`${ config.apiUrl}/users/`, { headers })
 
       if (response.status === 401 || response.status === 403) {
         throw new Error("Could not validate credentials. Please log in again.")
@@ -155,7 +156,7 @@ export default function UsersPage() {
         return
       }
       
-      const response = await fetch('http://localhost:8000/users/', {
+      const response = await fetch(`${ config.apiUrl}/users/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
