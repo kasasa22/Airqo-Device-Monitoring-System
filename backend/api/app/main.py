@@ -928,6 +928,11 @@ def create_user(
     return new_user
 
 
+@app.get("/users/", response_model=List[schemas.User])
+def get_users(db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
+    users = db.query(models.User).all()
+    return users
+
 @app.get("/health-tips/device/{device_id}")
 def get_health_tips_by_device(device_id: str, db=Depends(get_db)):
     try:
