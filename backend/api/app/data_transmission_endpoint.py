@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime, timedelta
 import json
-from typing import Dict, Any
+from typing import Optional, List, Dict, Any
+
 
 from app.database import get_db
 from app.utils import create_json_response
@@ -80,8 +81,8 @@ def get_device_transmission(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch device transmission data: {e}")
-    
-       
+
+
 @router.get("/data-volume")
 def get_data_volume(
     timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
