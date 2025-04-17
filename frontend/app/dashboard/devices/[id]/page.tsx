@@ -932,7 +932,7 @@ export default function DeviceDetailPage() {
                       mode="single"
                       selected={selectedDate}
                       onSelect={(date) => date && setSelectedDate(date)}
-                      initialFocus
+                      initialFocus={true} 
                     />
                   </PopoverContent>
                 </Popover>
