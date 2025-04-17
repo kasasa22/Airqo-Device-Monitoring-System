@@ -878,7 +878,7 @@ def create_user(
 
     
 
-@router.post("/users/", response_model=schemas.User)
+@app.post("/users/", response_model=schemas.User)
 def create_user(
     user: schemas.UserCreate,
     db: Session = Depends(database.get_db),
@@ -927,7 +927,7 @@ def create_user(
 
     return new_user
 
-       
+
 @app.get("/health-tips/device/{device_id}")
 def get_health_tips_by_device(device_id: str, db=Depends(get_db)):
     try:
