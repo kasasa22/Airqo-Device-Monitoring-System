@@ -1,11 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import json
-from typing import Optional, List, Dict, Any
-
 
 from app.database import get_db
 from app.utils import create_json_response
@@ -72,7 +70,7 @@ def get_device_transmission(
         transmission_data = [
             {
                 "date": row["date"],
-                "device_data": row["device_data"]
+                **row["device_data"]
             }
             for row in result
         ]
@@ -89,38 +87,44 @@ def get_data_volume(
     db: Session = Depends(get_db)
 ):
     try:
-        end_date = datetime.now()
+        # Use the same calculation approach as device-transmission
+        end_date = datetime.utcnow()
         if timeRange == "7days":
             start_date = end_date - timedelta(days=7)
-            interval = "day"
         elif timeRange == "30days":
             start_date = end_date - timedelta(days=30)
-            interval = "day"
         elif timeRange == "90days":
             start_date = end_date - timedelta(days=90)
-            interval = "week"
         elif timeRange == "year":
             start_date = end_date - timedelta(days=365)
-            interval = "month"
         else:
             start_date = end_date - timedelta(days=7)
-            interval = "day"
+            
+        # Determine the interval in days for grouping
+        if timeRange == "7days" or timeRange == "30days":
+            interval_days = 1  # Daily
+        elif timeRange == "90days":
+            interval_days = 7  # Weekly
+        elif timeRange == "year":
+            interval_days = 30  # Monthly
+        else:
+            interval_days = 1  # Default to daily
 
         query = text("""
             WITH date_series AS (
                 SELECT generate_series(
-                    DATE_TRUNC(:interval, :start_date)::date,
-                    DATE_TRUNC(:interval, :end_date)::date,
-                    ('1 ' || :interval)::interval
+                    DATE_TRUNC('day', CAST(:start_date AS TIMESTAMP))::date,
+                    DATE_TRUNC('day', CAST(:end_date AS TIMESTAMP))::date,
+                    CAST(:interval_days || ' days' AS INTERVAL)
                 ) AS date
             ),
             active_devices_per_day AS (
                 SELECT 
-                    DATE_TRUNC(:interval, timestamp)::date AS date,
+                    DATE_TRUNC('day', timestamp)::date AS date,
                     COUNT(DISTINCT device_key) AS active_devices
                 FROM fact_device_readings
-                WHERE timestamp BETWEEN :start_date AND :end_date
-                GROUP BY DATE_TRUNC(:interval, timestamp)::date
+                WHERE timestamp BETWEEN CAST(:start_date AS TIMESTAMP) AND CAST(:end_date AS TIMESTAMP)
+                GROUP BY DATE_TRUNC('day', timestamp)::date
             ),
             total_devices AS (
                 SELECT COUNT(*) AS count
@@ -129,44 +133,43 @@ def get_data_volume(
             ),
             readings_per_day AS (
                 SELECT 
-                    DATE_TRUNC(:interval, timestamp)::date AS date,
+                    DATE_TRUNC('day', timestamp)::date AS date,
                     COUNT(*) AS reading_count
                 FROM fact_device_readings
-                WHERE timestamp BETWEEN :start_date AND :end_date
-                GROUP BY DATE_TRUNC(:interval, timestamp)::date
+                WHERE timestamp BETWEEN CAST(:start_date AS TIMESTAMP) AND CAST(:end_date AS TIMESTAMP)
+                GROUP BY DATE_TRUNC('day', timestamp)::date
             )
             SELECT 
                 ds.date::text AS date,
-                COALESCE(rpd.reading_count, 0) AS dataVolume,
-                CASE 
-                    WHEN :interval = 'day' THEN td.count * 24 * 12
-                    WHEN :interval = 'week' THEN td.count * 24 * 7 * 12
-                    WHEN :interval = 'month' THEN td.count * 24 * 30 * 12
-                END AS expectedVolume,
-                COALESCE(adpd.active_devices, 0) AS devices
+                COALESCE(SUM(rpd.reading_count), 0) AS dataVolume,
+                (SELECT count FROM total_devices) * 24 * :interval_days * 12 AS expectedVolume,
+                COALESCE(COUNT(DISTINCT adpd.active_devices), 0) AS devices
             FROM date_series ds
-            CROSS JOIN total_devices td
-            LEFT JOIN readings_per_day rpd ON ds.date = rpd.date
-            LEFT JOIN active_devices_per_day adpd ON ds.date = adpd.date
+            LEFT JOIN readings_per_day rpd 
+                ON rpd.date BETWEEN ds.date AND ds.date + CAST(:interval_days || ' days' AS INTERVAL) - INTERVAL '1 day'
+            LEFT JOIN active_devices_per_day adpd 
+                ON adpd.date BETWEEN ds.date AND ds.date + CAST(:interval_days || ' days' AS INTERVAL) - INTERVAL '1 day'
+            GROUP BY ds.date, (SELECT count FROM total_devices)
             ORDER BY ds.date
         """)
 
         result = db.execute(query, {
             "start_date": start_date,
             "end_date": end_date,
-            "interval": interval
-        }).mappings().all()
+            "interval_days": interval_days
+        }).fetchall()
 
-        return create_json_response([
-            {
-                "date": row["date"],
-                "dataVolume": row["dataVolume"],
-                "expectedVolume": row["expectedVolume"],
-                "devices": row["devices"]
-            }
-            for row in result
-        ])
-
+        volume_data = []
+        for row in result:
+            volume_data.append({
+                "date": row[0],
+                "dataVolume": row[1],
+                "expectedVolume": row[2],
+                "devices": row[3]
+            })
+        
+        return create_json_response(volume_data)
+    
     except Exception as e:
         print(f"Error in get_data_volume: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch data volume metrics: {str(e)}")
@@ -180,24 +183,17 @@ def get_hourly_transmission(db: Session = Depends(get_db)):
     try:
         # Query for hourly data patterns over the last 7 days
         query = text("""
-            WITH hourly_data AS (
-                SELECT 
-                    EXTRACT(HOUR FROM timestamp) AS hour,
-                    COUNT(*) AS data_count,
-                    COUNT(DISTINCT device_key) AS device_count
-                FROM fact_device_readings
-                WHERE timestamp >= NOW() - INTERVAL '7 days'
-                GROUP BY EXTRACT(HOUR FROM timestamp)
-                ORDER BY EXTRACT(HOUR FROM timestamp)
-            )
             SELECT 
-                LPAD(hour::text, 2, '0') || ':00' AS hour,
-                data_count AS dataVolume,
-                device_count AS devices
-            FROM hourly_data
+                LPAD(EXTRACT(HOUR FROM timestamp)::text, 2, '0') || ':00' AS hour,
+                COUNT(*) AS dataVolume,
+                COUNT(DISTINCT device_key) AS devices
+            FROM fact_device_readings
+            WHERE timestamp >= NOW() - INTERVAL '7 days'
+            GROUP BY EXTRACT(HOUR FROM timestamp)
+            ORDER BY EXTRACT(HOUR FROM timestamp)
         """)
         
-        result = db.execute(query)
+        result = db.execute(query).fetchall()
         
         # Process the results
         hourly_data = []
@@ -225,7 +221,7 @@ def get_device_failures(
     """
     try:
         # Calculate date range based on timeRange parameter
-        end_date = datetime.now()
+        end_date = datetime.utcnow()
         if timeRange == "7days":
             start_date = end_date - timedelta(days=7)
         elif timeRange == "30days":
@@ -237,68 +233,45 @@ def get_device_failures(
         else:
             start_date = end_date - timedelta(days=7)
         
-        # Query to get device failure data
+        # Query to get device failure data - simplified to avoid complex CTE nesting
         query = text("""
-            WITH date_series AS (
-                SELECT generate_series(:start_date::timestamp, :end_date::timestamp, '1 day'::interval) AS date
-            ),
-            device_status AS (
+            WITH device_analysis AS (
                 SELECT 
                     d.device_key,
                     d.device_id,
                     d.device_name,
-                    -- Count days with no data as failures
+                    COUNT(DISTINCT DATE(r.timestamp)) AS active_days,
                     (
-                        SELECT COUNT(DISTINCT ds.date)
-                        FROM date_series ds
-                        LEFT JOIN fact_device_readings r ON 
-                            d.device_key = r.device_key AND 
-                            DATE(r.timestamp) = DATE(ds.date)
-                        WHERE r.reading_key IS NULL
-                    ) AS failure_days,
-                    -- Calculate uptime percentage
-                    (
-                        SELECT COUNT(DISTINCT DATE(r.timestamp)) * 100.0 / 
-                            (SELECT COUNT(*) FROM date_series)
-                        FROM fact_device_readings r
-                        WHERE d.device_key = r.device_key 
-                        AND timestamp BETWEEN :start_date AND :end_date
-                    ) AS uptime_percentage,
-                    -- Get first failure date if any
-                    (
-                        SELECT MIN(DATE(ds.date))
-                        FROM date_series ds
-                        LEFT JOIN fact_device_readings r ON 
-                            d.device_key = r.device_key AND 
-                            DATE(r.timestamp) = DATE(ds.date)
-                        WHERE r.reading_key IS NULL
-                        LIMIT 1
-                    ) AS first_failure_date
+                        SELECT COUNT(DISTINCT DATE(ds.day))
+                        FROM generate_series(
+                            CAST(:start_date AS TIMESTAMP), 
+                            CAST(:end_date AS TIMESTAMP), 
+                            INTERVAL '1 day'
+                        ) ds(day)
+                    ) AS total_days
                 FROM dim_device d
+                LEFT JOIN fact_device_readings r 
+                    ON d.device_key = r.device_key
+                    AND r.timestamp BETWEEN CAST(:start_date AS TIMESTAMP) AND CAST(:end_date AS TIMESTAMP)
                 WHERE d.is_active = true AND d.status = 'deployed'
+                GROUP BY d.device_key, d.device_id, d.device_name
             )
             SELECT
                 device_id AS device,
                 device_name AS name, 
-                failure_days AS failures,
-                COALESCE(uptime_percentage, 0) AS uptime,
+                total_days - active_days AS failures,
+                CASE WHEN total_days > 0 THEN (active_days * 100.0 / total_days) ELSE 0 END AS uptime,
                 CASE
-                    WHEN failure_days = 0 THEN 'No failures'
-                    WHEN failure_days = 1 THEN 'One failure on ' || first_failure_date
-                    ELSE failure_days || ' failures'
+                    WHEN total_days - active_days = 0 THEN 'No failures'
+                    WHEN total_days - active_days = 1 THEN 'One day with no data'
+                    ELSE (total_days - active_days)::text || ' days with no data'
                 END AS status
-            FROM device_status
-            ORDER BY failure_days DESC, device_id
+            FROM device_analysis
+            ORDER BY (total_days - active_days) DESC, device_id
             LIMIT 10
         """)
         
-        result = db.execute(
-            query, 
-            {
-                "start_date": start_date, 
-                "end_date": end_date
-            }
-        )
+        result = db.execute(query, {"start_date": start_date, "end_date": end_date}).fetchall()
         
         # Process the results
         failures_data = []
