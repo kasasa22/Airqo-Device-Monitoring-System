@@ -14,6 +14,7 @@ import math
 import sys
 from app.device_performance_endpoint import router as performance_router, register_with_app
 from app.site_performance_endpoint import router as site_router, register_with_app as register_site_endpoints
+from app.data_transmission_endpoint import router as data_transmission_router, register_with_app as register_data_analytics
 
 
 from datetime import datetime, timedelta
