@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
+import { config } from "@/lib/config"
 
-// API URL - adjust this to point to your FastAPI backend
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -40,7 +40,7 @@ export default function LoginPage() {
       formData.append('password', password);
 
       // Make API call to your FastAPI authentication endpoint
-      const response = await fetch("http://localhost:8000/login", {
+      const response = await fetch(`${config.apiUrl}/login`, {
         method: "POST",
         body: formData,
       });
