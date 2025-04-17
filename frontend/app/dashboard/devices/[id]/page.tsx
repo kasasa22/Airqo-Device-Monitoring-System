@@ -5,6 +5,10 @@ import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Calendar as CalendarIcon } from "lucide-react"
+import { format } from "date-fns"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   LineChart,
@@ -98,6 +102,8 @@ export default function DeviceDetailPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [analysis, setAnalysis] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [filteredReadings, setFilteredReadings] = useState([])
   
   // Generate sample historical data for charts
   const [historicalData, setHistoricalData] = useState(generateSampleData(10))
@@ -173,6 +179,22 @@ export default function DeviceDetailPage() {
     
     return () => clearTimeout(timer)
   }, [params.id])
+
+  useEffect(() => {
+    if (device?.readings_history && device.readings_history.length > 0) {
+      // Format the selected date to YYYY-MM-DD for comparison
+      const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd')
+      
+      // Filter readings for the selected date
+      const filtered = device.readings_history.filter(reading => {
+        if (!reading.timestamp) return false
+        const readingDate = new Date(reading.timestamp).toISOString().split('T')[0]
+        return readingDate === formattedSelectedDate
+      })
+      
+      setFilteredReadings(filtered)
+    }
+  }, [selectedDate, device?.readings_history])
   
   // Function to get battery icon based on percentage
   const getBatteryIcon = useCallback((batteryStr) => {
@@ -894,22 +916,44 @@ export default function DeviceDetailPage() {
                   </div>
                 )}
 
-                <h3 className="text-md font-medium mt-4 mb-2">Data Transmission Summary</h3>
-                {device.readings_history && device.readings_history.length > 0 ? (
+                <h3 className="text-md font-medium mt-4 mb-2 flex justify-between items-center">
+                <span>Data Transmission Summary</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="flex items-center justify-center gap-2"
+                    >
+                      <CalendarIcon className="h-4 w-4" />
+                      {format(selectedDate, "PPP")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(date) => date && setSelectedDate(date)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </h3>
+              {device?.readings_history && device.readings_history.length > 0 ? (
+                filteredReadings.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
                         <tr className="bg-gray-50">
-                          <th className="text-left py-3 px-4 font-medium text-gray-600">Date</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-600">Time</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-600">PM2.5</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-600">PM10</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-600">AQI Category</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {device.readings_history.map((reading, idx) => (
+                        {filteredReadings.map((reading) => (
                           <tr key={reading.timestamp} className="border-b hover:bg-gray-50 transition-colors">
-                            <td className="py-3 px-4">{formatDate(reading.timestamp)}</td>
+                            <td className="py-3 px-4">{new Date(reading.timestamp).toLocaleTimeString()}</td>
                             <td className="py-3 px-4">{typeof reading.pm2_5 === 'number' ? reading.pm2_5.toFixed(1) : (reading.pm2_5 || 'N/A')} µg/m³</td>
                             <td className="py-3 px-4">{typeof reading.pm10 === 'number' ? reading.pm10.toFixed(1) : (reading.pm10 || 'N/A')} µg/m³</td>
                             <td className="py-3 px-4">
@@ -933,58 +977,8 @@ export default function DeviceDetailPage() {
                       </tbody>
                     </table>
                   </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="text-left py-3 px-4 font-medium text-gray-600">Date</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-600">Data Points</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-600">Expected</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-600">Completeness</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {/* Generate sample data for last 7 days */}
-                        {Array(7).fill().map((_, index) => {
-                          const date = new Date()
-                          date.setDate(date.getDate() - index)
-                          const dateStr = date.toISOString().split('T')[0]
-                          
-                          // Generate random data
-                          const rand = Math.random()
-                          let status, dataPoints
-                          
-                          if (rand > 0.8) {
-                            status = "missing"
-                            dataPoints = 0
-                          } else if (rand > 0.7) {
-                            status = "partial"
-                            dataPoints = Math.floor(Math.random() * 70) + 30
-                          } else {
-                            status = "complete"
-                            dataPoints = 144
-                          }
-                          
-                          const expectedDataPoints = 144
-                          
-                          return (
-                            <tr key={dateStr} className="border-b hover:bg-gray-50 transition-colors">
-                              <td className="py-3 px-4">{dateStr}</td>
-                              <td className="py-3 px-4">{getDataStatusBadge(status)}</td>
-                              <td className="py-3 px-4">{dataPoints}</td>
-                              <td className="py-3 px-4">{expectedDataPoints}</td>
-                              <td className="py-3 px-4">
-                                {dataPoints > 0 ? Math.round((dataPoints / expectedDataPoints) * 100) + '%' : '0%'}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                ) : null
+              ) : null}
               </div>
               {/* New AI Analysis section starts here */}
               <div className="mt-6 border-t pt-6">
