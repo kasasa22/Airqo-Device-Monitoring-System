@@ -34,6 +34,7 @@ import {
   CalendarRange,
   Filter,
 } from "lucide-react"
+import {config} from "@/lib/config"
 
 // This will be part of the existing analytics page, focusing on data transmission
 export default function DataTransmissionAnalysis({ timeRange }) {
@@ -51,25 +52,25 @@ export default function DataTransmissionAnalysis({ timeRange }) {
       setIsLoading(true)
       try {
         // Get device transmission data
-        const transmissionResponse = await fetch(`/api/analytics/device-transmission?timeRange=${dateFilter}`)
+        const transmissionResponse = await fetch(`${config.apiUrl}/api/analytics/device-transmission?timeRange=${dateFilter}`)
         if (!transmissionResponse.ok) throw new Error("Failed to fetch device transmission data")
         const transmissionData = await transmissionResponse.json()
         setDeviceTransmissionData(transmissionData)
 
         // Get data volume over time
-        const volumeResponse = await fetch(`/api/analytics/data-volume?timeRange=${dateFilter}`)
+        const volumeResponse = await fetch(`${config.apiUrl}/api/analytics/data-volume?timeRange=${dateFilter}`)
         if (!volumeResponse.ok) throw new Error("Failed to fetch data volume information")
         const volumeData = await volumeResponse.json()
         setDataVolumeOverTime(volumeData)
 
         // Get hourly transmission patterns
-        const hourlyResponse = await fetch(`/api/analytics/hourly-transmission`)
+        const hourlyResponse = await fetch(`${config.apiUrl}/api/analytics/hourly-transmission`)
         if (!hourlyResponse.ok) throw new Error("Failed to fetch hourly transmission data")
         const hourlyData = await hourlyResponse.json()
         setHourlyTransmissionData(hourlyData)
 
         // Get device failure analysis
-        const failureResponse = await fetch(`/api/analytics/device-failures?timeRange=${dateFilter}`)
+        const failureResponse = await fetch(`${config.apiUrl}/api/analytics/device-failures?timeRange=${dateFilter}`)
         if (!failureResponse.ok) throw new Error("Failed to fetch device failure data")
         const failureData = await failureResponse.json()
         setFailureAnalysis(failureData)
