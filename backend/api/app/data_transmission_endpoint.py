@@ -11,18 +11,30 @@ from app.utils import create_json_response
 # Create router for data transmission analytics
 router = APIRouter(prefix="/api/analytics", tags=["data-analytics"])
 
-@router.get("/device-transmission", response_model=List[Dict[str, Any]])
+@router.get("/device-transmission")
 def get_device_transmission(
-    start_date: Optional[datetime] = Query(None),
-    end_date: Optional[datetime] = Query(None),
+    timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
     db: Session = Depends(get_db)
-) -> List[Dict[str, Any]]:
+):
+    """
+    Get data transmission status by device over time.
+    Returns a time series showing when devices successfully transmitted data.
+    """
     try:
-        # Use default 7-day range if no dates are provided
-        if not start_date or not end_date:
-            end_date = datetime.utcnow()
-            start_date = end_date - timedelta(days=6)
-
+        # Calculate date range based on timeRange parameter
+        end_date = datetime.utcnow()
+        if timeRange == "7days":
+            start_date = end_date - timedelta(days=7)
+        elif timeRange == "30days":
+            start_date = end_date - timedelta(days=30)
+        elif timeRange == "90days":
+            start_date = end_date - timedelta(days=90)
+        elif timeRange == "year":
+            start_date = end_date - timedelta(days=365)
+        else:
+            start_date = end_date - timedelta(days=7)
+        
+        # Query to get device transmission data with proper format
         query = text("""
             WITH date_series AS (
                 SELECT generate_series(
@@ -32,54 +44,62 @@ def get_device_transmission(
                 ) AS date
             ),
             active_devices AS (
-                SELECT DISTINCT device_id, device_key
+                SELECT DISTINCT device_id, device_key, device_name
                 FROM dim_device
                 WHERE is_active = true AND status = 'deployed'
             ),
-            device_dates AS (
-                SELECT 
-                    ds.date, 
-                    ad.device_id, 
-                    ad.device_key
-                FROM date_series ds
-                CROSS JOIN active_devices ad
-            ),
-            readings_per_day AS (
+            device_readings AS (
                 SELECT 
                     DATE_TRUNC('day', r.timestamp)::date AS reading_date,
-                    r.device_key,
-                    COUNT(*) AS reading_count
-                FROM fact_device_readings r
-                GROUP BY DATE_TRUNC('day', r.timestamp)::date, r.device_key
+                    d.device_id,
+                    d.device_name,
+                    COUNT(r.reading_key) AS reading_count
+                FROM dim_device d
+                JOIN fact_device_readings r ON d.device_key = r.device_key
+                WHERE r.timestamp BETWEEN CAST(:start_date AS TIMESTAMP) AND CAST(:end_date AS TIMESTAMP)
+                GROUP BY DATE_TRUNC('day', r.timestamp)::date, d.device_id, d.device_name
             )
             SELECT 
-                dd.date::text AS date,
+                ds.date::text AS date,
                 json_object_agg(
-                    dd.device_id, 
-                    CASE WHEN rpd.reading_count > 0 THEN 100 ELSE 0 END
+                    ad.device_id, 
+                    CASE 
+                        WHEN dr.reading_count > 0 THEN 100 
+                        ELSE 0 
+                    END
                 ) AS device_data
-            FROM device_dates dd
-            LEFT JOIN readings_per_day rpd
-                ON dd.device_key = rpd.device_key AND dd.date = rpd.reading_date
-            GROUP BY dd.date
-            ORDER BY dd.date;
+            FROM date_series ds
+            CROSS JOIN active_devices ad
+            LEFT JOIN device_readings dr 
+                ON dr.reading_date = ds.date
+                AND dr.device_id = ad.device_id
+            GROUP BY ds.date
+            ORDER BY ds.date;
         """)
-
-        result = db.execute(query, {"start_date": start_date, "end_date": end_date}).mappings().all()
-
-        transmission_data = [
-            {
-                "date": row["date"],
-                **row["device_data"]
-            }
-            for row in result
-        ]
-
-        return transmission_data
-
+        
+        result = db.execute(query, {"start_date": start_date, "end_date": end_date}).fetchall()
+        
+        # Process the results into a format suitable for the frontend chart
+        transmission_data = []
+        for row in result:
+            date_str = row[0]
+            device_data = row[1] if row[1] else {}
+            
+            # Create a row with the date and device values
+            row_data = {"date": date_str}
+            
+            # Add device data
+            if isinstance(device_data, dict):
+                for device_id, value in device_data.items():
+                    row_data[device_id] = value
+            
+            transmission_data.append(row_data)
+        
+        return create_json_response(transmission_data)
+    
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch device transmission data: {e}")
-
+        print(f"Error in get_device_transmission: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch device transmission data: {str(e)}")
 
 @router.get("/data-volume")
 def get_data_volume(
@@ -181,12 +201,13 @@ def get_hourly_transmission(db: Session = Depends(get_db)):
     Returns data volume and active device count by hour of day.
     """
     try:
-        # Modified query to avoid the parameter binding issue with ':00'
+        # Using a different approach to avoid the parameter binding issue with ':00'
+        # The parameter binding is interpreting the colon in ':00' as a parameter
         query = text("""
             SELECT 
-                LPAD(EXTRACT(HOUR FROM timestamp)::text, 2, '0') || ':00' AS hour_str,
-                COUNT(*) AS dataVolume,
-                COUNT(DISTINCT device_key) AS devices
+                CONCAT(LPAD(EXTRACT(HOUR FROM timestamp)::text, 2, '0'), ' hours') AS hour_display,
+                COUNT(*) AS data_volume,
+                COUNT(DISTINCT device_key) AS device_count
             FROM fact_device_readings
             WHERE timestamp >= NOW() - INTERVAL '7 days'
             GROUP BY EXTRACT(HOUR FROM timestamp)
@@ -195,11 +216,14 @@ def get_hourly_transmission(db: Session = Depends(get_db)):
         
         result = db.execute(query).fetchall()
         
-        # Process the results
+        # Process the results and format the hour string in Python instead of SQL
         hourly_data = []
         for row in result:
+            # The hour comes out as "XX hours", we'll reformat it to "XX:00"
+            hour_str = row[0].replace(' hours', ':00')
+            
             hourly_data.append({
-                "hour": row[0],
+                "hour": hour_str,
                 "dataVolume": row[1],
                 "devices": row[2]
             })
@@ -208,8 +232,7 @@ def get_hourly_transmission(db: Session = Depends(get_db)):
     
     except Exception as e:
         print(f"Error in get_hourly_transmission: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch hourly transmission data: {str(e)}")
-    
+        raise HTTPException(status_code=500, detail=f"Failed to fetch hourly transmission data: {str(e)}")    
 
 @router.get("/device-failures")
 def get_device_failures(
