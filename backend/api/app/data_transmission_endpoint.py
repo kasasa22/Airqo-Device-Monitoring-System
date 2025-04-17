@@ -16,8 +16,12 @@ def get_device_transmission(
     timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
     db: Session = Depends(get_db)
 ):
+    """
+    Get data transmission status by device over time.
+    Returns a time series showing when devices successfully transmitted data.
+    """
     try:
-        # Define date range
+        # Determine time interval
         end_date = datetime.now()
         if timeRange == "7days":
             start_date = end_date - timedelta(days=7)
@@ -35,7 +39,6 @@ def get_device_transmission(
             start_date = end_date - timedelta(days=7)
             interval = "day"
 
-        # Use f-string for interval and parameters for dates
         query = text(f"""
             WITH date_series AS (
                 SELECT generate_series(
@@ -67,7 +70,7 @@ def get_device_transmission(
                 json_object_agg(
                     dt.device_id, 
                     CASE WHEN dt.has_data THEN 100 ELSE 0 END
-                ) AS device_data
+                ) FILTER (WHERE dt.device_id IS NOT NULL) AS device_data
             FROM date_series ds
             CROSS JOIN active_devices ad
             LEFT JOIN device_transmission dt 
@@ -81,13 +84,13 @@ def get_device_transmission(
             "end_date": end_date
         })
 
-        # Parse the results
         transmission_data = []
         for row in result:
             date_str = row[0]
-            device_data = row[1] if row[1] else {}
+            device_data = row[1] or {}
             row_data = {"date": date_str}
-            row_data.update(device_data)
+            if isinstance(device_data, dict):
+                row_data.update(device_data)
             transmission_data.append(row_data)
 
         return create_json_response(transmission_data)
