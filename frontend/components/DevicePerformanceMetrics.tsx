@@ -31,9 +31,7 @@ import {
   Timer,
   Calendar,
 } from "lucide-react";
-
-// The API base URL - should be configured in your environment variables
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { config } from "@/lib/config";
 
 const DevicePerformanceMetrics = ({ deviceId, timeRange = "7days" }) => {
   const [performanceData, setPerformanceData] = useState(null);
@@ -63,7 +61,7 @@ const DevicePerformanceMetrics = ({ deviceId, timeRange = "7days" }) => {
       setError(null);
 
       const response = await fetch(
-        `${API_BASE_URL}/device-performance/${deviceId}?timeRange=${timeRange}`
+        `${config.apiUrl}/device-performance/${deviceId}?timeRange=${timeRange}`
       );
 
       if (!response.ok) {

@@ -4,9 +4,7 @@ import { useEffect, useState } from 'react'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertTriangle, Info } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-
-// API base URL - should be configured in your environment variables
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+import { config } from '@/lib/config'
 
 export default function HealthTipsSection({ deviceId, readingKey, airQuality }) {
   const [healthTips, setHealthTips] = useState([])
@@ -21,11 +19,11 @@ export default function HealthTipsSection({ deviceId, readingKey, airQuality }) 
 
         let endpoint
         if (readingKey) {
-          endpoint = `${API_BASE_URL}/health-tips/reading/${readingKey}`
+          endpoint = `${config.apiUrl}/health-tips/reading/${readingKey}`
         } else if (deviceId) {
-          endpoint = `${API_BASE_URL}/health-tips/device/${deviceId}`
+          endpoint = `${config.apiUrl}/health-tips/device/${deviceId}`
         } else if (airQuality) {
-          endpoint = `${API_BASE_URL}/health-tips/category/${encodeURIComponent(airQuality)}`
+          endpoint = `${config.apiUrl}/health-tips/category/${encodeURIComponent(airQuality)}`
         } else {
           setHealthTips([])
           setLoading(false)
