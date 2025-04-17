@@ -36,6 +36,7 @@ app = FastAPI()
 
 register_with_app(app)
 register_site_endpoints(app)
+register_data_analytics(app)
 
 
 # Custom JSON encoder to handle special values
