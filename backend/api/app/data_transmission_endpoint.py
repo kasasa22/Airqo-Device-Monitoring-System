@@ -181,10 +181,10 @@ def get_hourly_transmission(db: Session = Depends(get_db)):
     Returns data volume and active device count by hour of day.
     """
     try:
-        # Query for hourly data patterns over the last 7 days
+        # Modified query to avoid the parameter binding issue with ':00'
         query = text("""
             SELECT 
-                LPAD(EXTRACT(HOUR FROM timestamp)::text, 2, '0') || ':00' AS hour,
+                LPAD(EXTRACT(HOUR FROM timestamp)::text, 2, '0') || ':00' AS hour_str,
                 COUNT(*) AS dataVolume,
                 COUNT(DISTINCT device_key) AS devices
             FROM fact_device_readings
@@ -209,7 +209,7 @@ def get_hourly_transmission(db: Session = Depends(get_db)):
     except Exception as e:
         print(f"Error in get_hourly_transmission: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch hourly transmission data: {str(e)}")
-
+    
 @router.get("/device-failures")
 def get_device_failures(
     timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
