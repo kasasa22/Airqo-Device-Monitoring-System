@@ -1316,6 +1316,46 @@ function getDayOfWeekVolume(dayNumber, volumeData) {
     }
   }
   
+  // Generate recommendations based on data
+  function generateRecommendations(networkStats, failureAnalysis, hourlyData, dataDrops) {
+    const recommendations = [];
+    
+    // Check for devices with high failure rates
+    const highFailureDevices = failureAnalysis.filter(d => d.failures > 3);
+    if (highFailureDevices.length > 0) {
+      recommendations.push(`Investigate ${highFailureDevices.length} devices with high failure rates, starting with ${highFailureDevices[0].name || highFailureDevices[0].device}.`);
+    }
+    
+    // Check for significant data drops
+    if (dataDrops.length > 0) {
+      recommendations.push(`Review network conditions on ${dataDrops[0].date} when a ${dataDrops[0].dropPercentage}% data volume drop occurred.`);
+    }
+    
+    // Check data completeness
+    if (networkStats.dataCompleteness < 80) {
+      recommendations.push(`Improve overall data completeness from ${networkStats.dataCompleteness}% to at least 90% by addressing device reliability issues.`);
+    }
+    
+    // Check hourly patterns
+    if (hourlyData && hourlyData.length > 0) {
+      const minDeviceHour = hourlyData.reduce((min, h) => h.devices < min.devices ? h : min, hourlyData[0]);
+      if (minDeviceHour.devices < hourlyData[0].devices * 0.8) {
+        recommendations.push(`Investigate why fewer devices are transmitting data during ${minDeviceHour.hour} hours.`);
+      }
+    }
+    
+    // Always recommend maintenance for failing devices
+    if (networkStats.failingDevices > 0) {
+      recommendations.push(`Schedule maintenance for ${networkStats.failingDevices} devices showing transmission failures.`);
+    }
+    
+    // If we have few recommendations, add a default one
+    if (recommendations.length === 0) {
+      recommendations.push("Continue regular maintenance schedule to maintain current transmission quality.");
+    }
+    
+    return recommendations;
+  }
   
   export {
     getDayOfWeekVolume,
