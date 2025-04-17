@@ -210,14 +210,15 @@ def get_hourly_transmission(db: Session = Depends(get_db)):
         print(f"Error in get_hourly_transmission: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch hourly transmission data: {str(e)}")
     
+
 @router.get("/device-failures")
 def get_device_failures(
     timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
     db: Session = Depends(get_db)
 ):
     """
-    Get device failure analysis.
-    Returns devices with the most frequent data transmission failures.
+    Get detailed device failure analysis showing specific transmission failures.
+    Detects actual instances of transmission failures by day for each device.
     """
     try:
         # Calculate date range based on timeRange parameter
@@ -233,63 +234,103 @@ def get_device_failures(
         else:
             start_date = end_date - timedelta(days=7)
         
-        # Query to get device failure data - simplified to avoid complex CTE nesting
-        query = text("""
-            WITH device_analysis AS (
-                SELECT 
-                    d.device_key,
-                    d.device_id,
-                    d.device_name,
-                    COUNT(DISTINCT DATE(r.timestamp)) AS active_days,
-                    (
-                        SELECT COUNT(DISTINCT DATE(ds.day))
-                        FROM generate_series(
-                            CAST(:start_date AS TIMESTAMP), 
-                            CAST(:end_date AS TIMESTAMP), 
-                            INTERVAL '1 day'
-                        ) ds(day)
-                    ) AS total_days
-                FROM dim_device d
-                LEFT JOIN fact_device_readings r 
-                    ON d.device_key = r.device_key
-                    AND r.timestamp BETWEEN CAST(:start_date AS TIMESTAMP) AND CAST(:end_date AS TIMESTAMP)
-                WHERE d.is_active = true AND d.status = 'deployed'
-                GROUP BY d.device_key, d.device_id, d.device_name
-            )
-            SELECT
-                device_id AS device,
-                device_name AS name, 
-                total_days - active_days AS failures,
-                CASE WHEN total_days > 0 THEN (active_days * 100.0 / total_days) ELSE 0 END AS uptime,
-                CASE
-                    WHEN total_days - active_days = 0 THEN 'No failures'
-                    WHEN total_days - active_days = 1 THEN 'One day with no data'
-                    ELSE (total_days - active_days)::text || ' days with no data'
-                END AS status
-            FROM device_analysis
-            ORDER BY (total_days - active_days) DESC, device_id
-            LIMIT 10
+        # Query to identify active devices with transmission data
+        active_devices_query = text("""
+            SELECT 
+                device_key, device_id, device_name
+            FROM dim_device
+            WHERE is_active = true AND status = 'deployed'
         """)
         
-        result = db.execute(query, {"start_date": start_date, "end_date": end_date}).fetchall()
+        active_devices = db.execute(active_devices_query).fetchall()
         
-        # Process the results
-        failures_data = []
-        for row in result:
-            failures_data.append({
-                "device": row[0],
-                "name": row[1],
-                "failures": row[2],
-                "uptime": row[3],
-                "status": row[4]
-            })
+        # Check if we have active devices
+        if not active_devices:
+            return create_json_response([])
         
-        return create_json_response(failures_data)
+        # For each active device, analyze transmission patterns by day
+        failure_data = []
+        
+        for device in active_devices:
+            device_key = device[0]
+            device_id = device[1]
+            device_name = device[2]
+            
+            # Get transmission data for this device by day
+            transmission_query = text("""
+                WITH date_series AS (
+                    SELECT generate_series(
+                        DATE_TRUNC('day', CAST(:start_date AS TIMESTAMP))::date,
+                        DATE_TRUNC('day', CAST(:end_date AS TIMESTAMP))::date,
+                        INTERVAL '1 day'
+                    ) AS date
+                ),
+                device_readings AS (
+                    SELECT 
+                        DATE_TRUNC('day', timestamp)::date AS reading_day,
+                        COUNT(*) AS reading_count
+                    FROM fact_device_readings
+                    WHERE device_key = :device_key
+                    AND timestamp BETWEEN CAST(:start_date AS TIMESTAMP) AND CAST(:end_date AS TIMESTAMP)
+                    GROUP BY DATE_TRUNC('day', timestamp)::date
+                )
+                SELECT
+                    ds.date AS day,
+                    COALESCE(dr.reading_count, 0) AS readings
+                FROM date_series ds
+                LEFT JOIN device_readings dr ON ds.date = dr.reading_day
+                ORDER BY ds.date
+            """)
+            
+            transmission_data = db.execute(
+                transmission_query, 
+                {
+                    "device_key": device_key,
+                    "start_date": start_date,
+                    "end_date": end_date
+                }
+            ).fetchall()
+            
+            # Calculate failures and missing days
+            total_days = len(transmission_data)
+            failure_days = sum(1 for day in transmission_data if day[1] == 0)
+            uptime_pct = ((total_days - failure_days) / total_days) * 100 if total_days > 0 else 0
+            
+            # Get specific dates with failures for more detailed status
+            failure_dates = [day[0].strftime("%Y-%m-%d") for day in transmission_data if day[1] == 0]
+            
+            # Create status message with specific dates if there aren't too many
+            if failure_days == 0:
+                status_msg = "No failures"
+            elif failure_days == 1:
+                status_msg = f"Failed on {failure_dates[0]}"
+            elif failure_days <= 3:
+                status_msg = f"Failed on {', '.join(failure_dates)}"
+            else:
+                recent_failures = failure_dates[-3:]
+                status_msg = f"{failure_days} failures (most recent: {', '.join(recent_failures)})"
+            
+            # Add device to results if it has at least one failure or if we want to show all devices
+            if failure_days > 0:  # Only include devices with failures
+                failure_data.append({
+                    "device": device_id,
+                    "name": device_name,
+                    "failures": failure_days,
+                    "uptime": uptime_pct,
+                    "status": status_msg,
+                    "failure_dates": failure_dates
+                })
+        
+        # Sort by number of failures (most failures first)
+        failure_data.sort(key=lambda x: x["failures"], reverse=True)
+        
+        # Limit to top 10 devices with most failures
+        return create_json_response(failure_data[:10])
     
     except Exception as e:
         print(f"Error in get_device_failures: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch device failure data: {str(e)}")
-
+    
 # Register the router function
 def register_with_app(app):
     """Register the data analytics router with the FastAPI application"""
