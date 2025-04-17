@@ -617,4 +617,4 @@ function generateRecommendations(networkStats, failureAnalysis, hourlyData, data
   return recommendations;
 }
 
-export default DataTransm
+export default DataTransmissionAnalysis;
