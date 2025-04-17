@@ -88,12 +88,7 @@ def get_data_volume(
     timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
     db: Session = Depends(get_db)
 ):
-    """
-    Get data volume metrics over time.
-    Returns actual vs expected data volume and active device counts.
-    """
     try:
-        # Calculate date range based on timeRange parameter
         end_date = datetime.now()
         if timeRange == "7days":
             start_date = end_date - timedelta(days=7)
@@ -102,7 +97,7 @@ def get_data_volume(
             start_date = end_date - timedelta(days=30)
             interval = "day"
         elif timeRange == "90days":
-            start_date = end_date - timedelta(days=90) 
+            start_date = end_date - timedelta(days=90)
             interval = "week"
         elif timeRange == "year":
             start_date = end_date - timedelta(days=365)
@@ -110,16 +105,14 @@ def get_data_volume(
         else:
             start_date = end_date - timedelta(days=7)
             interval = "day"
-        
-        # Query to get data volume metrics
+
         query = text("""
             WITH date_series AS (
-                SELECT 
-                    generate_series(
-                        DATE_TRUNC(:interval, :start_date::timestamp)::date,
-                        DATE_TRUNC(:interval, :end_date::timestamp)::date,
-                        ('1 ' || :interval)::interval
-                    ) AS date
+                SELECT generate_series(
+                    DATE_TRUNC(:interval, :start_date)::date,
+                    DATE_TRUNC(:interval, :end_date)::date,
+                    ('1 ' || :interval)::interval
+                ) AS date
             ),
             active_devices_per_day AS (
                 SELECT 
@@ -146,9 +139,9 @@ def get_data_volume(
                 ds.date::text AS date,
                 COALESCE(rpd.reading_count, 0) AS dataVolume,
                 CASE 
-                    WHEN :interval = 'day' THEN td.count * 24 * 12 -- Hourly readings (12 per hour)
-                    WHEN :interval = 'week' THEN td.count * 24 * 7 * 12 -- Weekly
-                    WHEN :interval = 'month' THEN td.count * 24 * 30 * 12 -- Monthly (approx)
+                    WHEN :interval = 'day' THEN td.count * 24 * 12
+                    WHEN :interval = 'week' THEN td.count * 24 * 7 * 12
+                    WHEN :interval = 'month' THEN td.count * 24 * 30 * 12
                 END AS expectedVolume,
                 COALESCE(adpd.active_devices, 0) AS devices
             FROM date_series ds
@@ -157,28 +150,23 @@ def get_data_volume(
             LEFT JOIN active_devices_per_day adpd ON ds.date = adpd.date
             ORDER BY ds.date
         """)
-        
-        result = db.execute(
-            query, 
+
+        result = db.execute(query, {
+            "start_date": start_date,
+            "end_date": end_date,
+            "interval": interval
+        }).mappings().all()
+
+        return create_json_response([
             {
-                "start_date": start_date, 
-                "end_date": end_date,
-                "interval": interval
+                "date": row["date"],
+                "dataVolume": row["dataVolume"],
+                "expectedVolume": row["expectedVolume"],
+                "devices": row["devices"]
             }
-        )
-        
-        # Process the results
-        volume_data = []
-        for row in result:
-            volume_data.append({
-                "date": row[0],
-                "dataVolume": row[1],
-                "expectedVolume": row[2],
-                "devices": row[3]
-            })
-        
-        return create_json_response(volume_data)
-    
+            for row in result
+        ])
+
     except Exception as e:
         print(f"Error in get_data_volume: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch data volume metrics: {str(e)}")
