@@ -878,327 +878,56 @@ def create_user(
 
     
 
-@app.get("/device-detail/{device_id}")
-def get_device_detail(device_id: str, db=Depends(get_db)):
-    try:
-        # Complex query joining multiple tables to get comprehensive device information
-        query = text("""
-            WITH latest_readings AS (
-                SELECT DISTINCT ON (device_key) 
-                    device_key,
-                    site_key,
-                    timestamp,
-                    pm2_5,
-                    pm10,
-                    no2,
-                    aqi_category,
-                    aqi_color,
-                    aqi_color_name
-                FROM fact_device_readings
-                ORDER BY device_key, timestamp DESC
-            ),
-            latest_status AS (
-                SELECT DISTINCT ON (device_key)
-                    device_key,
-                    timestamp,
-                    is_online,
-                    device_status
-                FROM fact_device_status
-                ORDER BY device_key, timestamp DESC
-            )
-            SELECT 
-                -- Device basic information
-                d.device_key,
-                d.device_id,
-                d.device_name,
-                d.network,
-                d.category,
-                d.is_active,
-                d.status,
-                d.mount_type,
-                d.power_type,
-                d.height,
-                d.next_maintenance,
-                d.first_seen,
-                d.last_updated,
-                
-                -- Location information
-                l.location_key,
-                l.latitude,
-                l.longitude,
-                l.location_name,
-                l.search_name,
-                l.village,
-                l.admin_level_country,
-                l.admin_level_city,
-                l.admin_level_division,
-                l.site_category,
-                l.site_id,
-                l.site_name,
-                l.deployment_date,
-                
-                -- Latest readings
-                r.pm2_5,
-                r.pm10,
-                r.no2,
-                r.timestamp as reading_timestamp,
-                r.aqi_category,
-                r.aqi_color,
-                r.aqi_color_name,
-                
-                -- Latest status
-                st.is_online as current_is_online,
-                st.device_status as current_device_status,
-                st.timestamp as status_timestamp,
-                
-                -- Site information
-                s.site_name as full_site_name,
-                s.location_name as full_location_name,
-                s.search_name as full_search_name,
-                s.village as full_village,
-                s.town,
-                s.city,
-                s.district,
-                s.country,
-                s.data_provider,
-                s.site_category as full_site_category
-                
-            FROM dim_device d
-            LEFT JOIN dim_location l ON d.device_key = l.device_key AND l.is_active = true
-            LEFT JOIN latest_readings r ON d.device_key = r.device_key
-            LEFT JOIN latest_status st ON d.device_key = st.device_key
-            LEFT JOIN dim_site s ON r.site_key = s.site_key
-            WHERE d.device_id = :device_id
-        """)
-        
-        result = db.execute(query, {"device_id": device_id})
-        device_row = result.first()
-        
-        if not device_row:
-            raise HTTPException(status_code=404, detail=f"Device with ID {device_id} not found")
-        
-        # Directly convert row to dict without any type checking
-        raw_device_dict = {}
-        for column, value in device_row._mapping.items():
-            raw_device_dict[column] = value
-            
-        # Build a safe version of the device data
-        device_dict = {}
-        for key, value in raw_device_dict.items():
-            # Skip None values
-            if value is None:
-                device_dict[key] = None
-                continue
-                
-            # Handle different types without using isinstance
-            try:
-                # Try to convert to float (will work for Decimal and numeric types)
-                float_val = float(value)
-                # Check if NaN
-                if float_val != float_val:  # NaN check without math.isnan
-                    device_dict[key] = None
-                else:
-                    device_dict[key] = float_val
-            except (TypeError, ValueError):
-                # If conversion to float fails, try datetime
-                try:
-                    if hasattr(value, 'isoformat'):
-                        device_dict[key] = value.isoformat()
-                    else:
-                        # For strings and other types
-                        device_dict[key] = str(value)
-                except:
-                    # Last resort
-                    device_dict[key] = str(value)
-        
-        # Get maintenance history
-        maintenance_history_query = text("""
-            WITH maintenance_entries AS (
-                SELECT 
-                    timestamp,
-                    CASE 
-                        WHEN LAG(is_online) OVER (ORDER BY timestamp) = false AND is_online = true THEN 'Restored'
-                        WHEN LAG(is_online) OVER (ORDER BY timestamp) = true AND is_online = false THEN 'Offline'
-                        WHEN LAG(device_status) OVER (ORDER BY timestamp) != device_status THEN 'Status Change'
-                        ELSE null
-                    END as maintenance_type,
-                    CASE 
-                        WHEN LAG(is_online) OVER (ORDER BY timestamp) = false AND is_online = true THEN 'Device came back online'
-                        WHEN LAG(is_online) OVER (ORDER BY timestamp) = true AND is_online = false THEN 'Device went offline'
-                        WHEN LAG(device_status) OVER (ORDER BY timestamp) != device_status THEN 'Status changed to ' || device_status
-                        ELSE null
-                    END as description
-                FROM fact_device_status
-                WHERE device_key = :device_key
-                ORDER BY timestamp DESC
-            )
-            SELECT 
-                timestamp,
-                maintenance_type,
-                description
-            FROM maintenance_entries
-            WHERE maintenance_type IS NOT NULL
-            LIMIT 10
-        """)
-        
-        history_result = db.execute(maintenance_history_query, {"device_key": raw_device_dict.get('device_key')})
-        maintenance_history = []
-        
-        for row in history_result:
-            # Convert each row to dict without type checking
-            raw_history_dict = {}
-            for column, value in row._mapping.items():
-                raw_history_dict[column] = value
-                
-            # Build a safe version
-            history_dict = {}
-            for key, value in raw_history_dict.items():
-                if value is None:
-                    history_dict[key] = None
-                    continue
-                    
-                try:
-                    float_val = float(value)
-                    if float_val != float_val:  # NaN check without math.isnan
-                        history_dict[key] = None
-                    else:
-                        history_dict[key] = float_val
-                except (TypeError, ValueError):
-                    try:
-                        if hasattr(value, 'isoformat'):
-                            history_dict[key] = value.isoformat()
-                        else:
-                            history_dict[key] = str(value)
-                    except:
-                        history_dict[key] = str(value)
-                        
-            maintenance_history.append(history_dict)
-        
-        # Get readings history
-        readings_history_query = text("""
-            SELECT 
-                timestamp,
-                pm2_5,
-                pm10,
-                no2,
-                aqi_category
-            FROM fact_device_readings
-            WHERE device_key = :device_key
-            ORDER BY timestamp DESC
-            LIMIT 20
-        """)
-        
-        readings_result = db.execute(readings_history_query, {"device_key": raw_device_dict.get('device_key')})
-        readings_history = []
-        
-        for row in readings_result:
-            # Convert each row to dict without type checking
-            raw_reading_dict = {}
-            for column, value in row._mapping.items():
-                raw_reading_dict[column] = value
-                
-            # Build a safe version
-            reading_dict = {}
-            for key, value in raw_reading_dict.items():
-                if value is None:
-                    reading_dict[key] = None
-                    continue
-                    
-                try:
-                    float_val = float(value)
-                    if float_val != float_val:  # NaN check without math.isnan
-                        reading_dict[key] = None
-                    else:
-                        reading_dict[key] = float_val
-                except (TypeError, ValueError):
-                    try:
-                        if hasattr(value, 'isoformat'):
-                            reading_dict[key] = value.isoformat()
-                        else:
-                            reading_dict[key] = str(value)
-                    except:
-                        reading_dict[key] = str(value)
-                        
-            readings_history.append(reading_dict)
-        
-        # Structure the response with null checks
-        response = {
-            "device": {
-                "id": str(device_dict.get("device_id", "")) if device_dict.get("device_id") is not None else None,
-                "name": str(device_dict.get("device_name", "")) if device_dict.get("device_name") is not None else None,
-                "status": str(device_dict.get("status", "")) if device_dict.get("status") is not None else None,
-                "is_online": device_dict.get("current_is_online"),
-                "network": str(device_dict.get("network", "")) if device_dict.get("network") is not None else None,
-                "category": str(device_dict.get("category", "")) if device_dict.get("category") is not None else None,
-                "is_active": device_dict.get("is_active"),
-                "mount_type": str(device_dict.get("mount_type", "")) if device_dict.get("mount_type") is not None else None,
-                "power_type": str(device_dict.get("power_type", "")) if device_dict.get("power_type") is not None else None,
-                "height": device_dict.get("height"),
-                "next_maintenance": device_dict.get("next_maintenance"),
-                "first_seen": device_dict.get("first_seen"),
-                "last_updated": device_dict.get("last_updated")
-            },
-            "location": {
-                "latitude": device_dict.get("latitude"),
-                "longitude": device_dict.get("longitude"),
-                "name": str(device_dict.get("location_name", "")) if device_dict.get("location_name") is not None else 
-                        (str(device_dict.get("full_location_name", "")) if device_dict.get("full_location_name") is not None else None),
-                "country": str(device_dict.get("admin_level_country", "")) if device_dict.get("admin_level_country") is not None else 
-                           (str(device_dict.get("country", "")) if device_dict.get("country") is not None else None),
-                "city": str(device_dict.get("admin_level_city", "")) if device_dict.get("admin_level_city") is not None else 
-                        (str(device_dict.get("city", "")) if device_dict.get("city") is not None else None),
-                "division": str(device_dict.get("admin_level_division", "")) if device_dict.get("admin_level_division") is not None else None,
-                "village": str(device_dict.get("village", "")) if device_dict.get("village") is not None else 
-                           (str(device_dict.get("full_village", "")) if device_dict.get("full_village") is not None else None),
-                "deployment_date": device_dict.get("deployment_date")
-            },
-            "site": {
-                "id": str(device_dict.get("site_id", "")) if device_dict.get("site_id") is not None else None,
-                "name": str(device_dict.get("site_name", "")) if device_dict.get("site_name") is not None else 
-                        (str(device_dict.get("full_site_name", "")) if device_dict.get("full_site_name") is not None else None),
-                "category": str(device_dict.get("site_category", "")) if device_dict.get("site_category") is not None else 
-                            (str(device_dict.get("full_site_category", "")) if device_dict.get("full_site_category") is not None else None),
-                "data_provider": str(device_dict.get("data_provider", "")) if device_dict.get("data_provider") is not None else None
-            },
-            "latest_reading": {
-                "timestamp": device_dict.get("reading_timestamp"),
-                "pm2_5": device_dict.get("pm2_5"),
-                "pm10": device_dict.get("pm10"),
-                "no2": device_dict.get("no2"),
-                "aqi_category": str(device_dict.get("aqi_category", "")) if device_dict.get("aqi_category") is not None else None,
-                "aqi_color": str(device_dict.get("aqi_color", "")) if device_dict.get("aqi_color") is not None else None
-            },
-            "maintenance_history": maintenance_history,
-            "readings_history": readings_history
-        }
-        
-        # Custom JSON encoder function without using isinstance
-        def safe_json_encoder(obj):
-            try:
-                # Try standard json serialization
-                json.dumps(obj)
-                return obj
-            except:
-                # If that fails, try to convert the object to a string
-                try:
-                    if hasattr(obj, 'isoformat'):  # Handle datetime objects
-                        return obj.isoformat()
-                    return str(obj)
-                except:
-                    return None
-        
-        # Use a simpler approach - convert to string first then parse back
-        json_str = json.dumps(response, default=safe_json_encoder)
-        safe_response = json.loads(json_str)
-        
-        return safe_response
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error in get_device_detail: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch device details: {str(e)}")
-        
+@router.post("/users/", response_model=schemas.User)
+def create_user(
+    user: schemas.UserCreate,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Create a new user.
+    Only users with the 'superadmin' role are authorized to access this endpoint.
+    """
+    # Ensure the requester is a superadmin
+    if not current_user or current_user.role.lower() != "superadmin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only superadmin can create new users."
+        )
+
+    # Check if the user already exists
+    existing_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A user with this email already exists."
+        )
+
+    # Hash the user's password
+    hashed_password = get_password_hash(user.password)
+
+    # Create the new user object
+    new_user = models.User(
+        email=user.email,
+        password_hash=hashed_password,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        role=user.role,
+        status=user.status,
+        phone=user.phone,
+        location=user.location,
+        created_at=datetime.datetime.utcnow(),
+        updated_at=datetime.datetime.utcnow()
+    )
+
+    # Add and commit the new user
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return new_user
+
+       
 @app.get("/health-tips/device/{device_id}")
 def get_health_tips_by_device(device_id: str, db=Depends(get_db)):
     try:
