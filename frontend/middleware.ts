@@ -4,8 +4,7 @@ import type { NextRequest } from 'next/server'
 export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value
 
-  // Allow access to login page and public assets
-  if (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/_next')) {
+  if (request.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.next()
   }
 
