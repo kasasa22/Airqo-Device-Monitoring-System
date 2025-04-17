@@ -48,13 +48,17 @@ export default function LoginPage() {
       if (response.ok) {
         const data = await response.json();
         
-        // Save token and user data to localStorage
+        // Save to localStorage (optional for frontend use)
         localStorage.setItem('access_token', data.access_token);
         localStorage.setItem('user_data', JSON.stringify(data.user));
-        
-        // Authentication successful
+      
+        // Save token to cookie for middleware
+        document.cookie = `token=${data.access_token}; path=/;`;
+      
+        // Redirect to dashboard
         router.push("/dashboard");
-      } else {
+      }
+       else {
         // Try to get error message from response
         try {
           const errorData = await response.json();
