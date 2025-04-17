@@ -57,6 +57,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import SiteAnalyticsPage from "./site_analysis"
+import DataTransmissionAnalysis from "./DataTransmissionAnalysis"
 
 // Sample data for device performance metrics
 const devicePerformanceData = [
@@ -376,195 +377,12 @@ export default function AnalyticsPage() {
               <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="data-transmission" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Database className="mr-2 h-5 w-5 text-primary" />
-                    Data Transmission by Device
-                  </CardTitle>
-                  <CardDescription>
-                    Track which devices sent data at specific intervals (100% = data sent, 0% = no data)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={dataTransmissionByDeviceData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis domain={[0, 100]} />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="KLA001" name="Kampala Central" fill="#4CAF50" />
-                        <Bar dataKey="KLA002" name="Kampala East" fill="#2196F3" />
-                        <Bar dataKey="NBI001" name="Nairobi CBD" fill="#FF9800" />
-                        <Bar dataKey="LAG001" name="Lagos Island" fill="#9C27B0" />
-                        <Bar dataKey="CAI001" name="Cairo Downtown" fill="#F44336" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-                <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <AlertTriangle className="mr-2 h-4 w-4 text-yellow-500" />
-                    Multiple devices failed to transmit data on June 9th
-                  </div>
-                </CardFooter>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Activity className="mr-2 h-5 w-5 text-primary" />
-                    Data Volume Over Time
-                  </CardTitle>
-                  <CardDescription>Actual vs expected data volume with notable increases and decreases</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={dataVolumeOverTimeData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Area
-                          type="monotone"
-                          dataKey="expectedVolume"
-                          fill="#e3f2fd"
-                          stroke="#2196F3"
-                          name="Expected Data Volume"
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="dataVolume"
-                          stroke="#FF5722"
-                          strokeWidth={2}
-                          name="Actual Data Volume"
-                        />
-                        <Bar dataKey="devices" fill="#4CAF50" name="Active Devices" />
-                        <ReferenceLine x="2024-06-03" stroke="#F44336" strokeDasharray="3 3" label="Data Drop" />
-                        <ReferenceLine x="2024-06-09" stroke="#F44336" strokeDasharray="3 3" label="Major Drop" />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-                <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                  <Alert className="bg-yellow-50 border-yellow-200">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Data Flow Analysis</AlertTitle>
-                    <AlertDescription>
-                      <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
-                        <li>Data volume decreased by 20% on June 3rd due to one device going offline</li>
-                        <li>Data volume decreased by 40% on June 9th due to two devices going offline</li>
-                        <li>Data volume returned to normal on June 10th when all devices came back online</li>
-                      </ul>
-                    </AlertDescription>
-                  </Alert>
-                </CardFooter>
-              </Card>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Clock className="mr-2 h-5 w-5 text-primary" />
-                      Hourly Data Transmission Pattern
-                    </CardTitle>
-                    <CardDescription>Data volume and active devices by hour of day</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={hourlyDataTransmissionData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="hour" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Area
-                            type="monotone"
-                            dataKey="dataVolume"
-                            fill="#e3f2fd"
-                            stroke="#2196F3"
-                            name="Data Volume (KB)"
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="devices"
-                            stroke="#FF5722"
-                            strokeWidth={2}
-                            name="Active Devices"
-                          />
-                          <ReferenceLine x="05:00" stroke="#F44336" strokeDasharray="3 3" label="Device Offline" />
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Info className="mr-2 h-4 w-4 text-primary" />
-                      Data volume peaks during afternoon hours (12:00-14:00)
-                    </div>
-                  </CardFooter>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <WifiOff className="mr-2 h-5 w-5 text-primary" />
-                      Missing Data Analysis
-                    </CardTitle>
-                    <CardDescription>Devices with the most frequent data transmission failures</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart
-                          data={[
-                            { device: "KLA001", failures: 1, uptime: 90 },
-                            { device: "KLA002", failures: 2, uptime: 80 },
-                            { device: "NBI001", failures: 2, uptime: 80 },
-                            { device: "LAG001", failures: 1, uptime: 90 },
-                            { device: "CAI001", failures: 1, uptime: 90 },
-                          ]}
-                          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="device" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Bar dataKey="failures" fill="#F44336" name="Data Transmission Failures" />
-                          <Line type="monotone" dataKey="uptime" stroke="#4CAF50" name="Data Uptime (%)" />
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="mt-4">
-                      <h3 className="text-md font-medium mb-2">Device Data Transmission Summary</h3>
-                      <div className="space-y-2">
-                        {[
-                          { device: "KLA001", status: "1 failure on Jun 3", class: "bg-yellow-50 border-yellow-200" },
-                          { device: "KLA002", status: "2 failures on Jun 5, Jun 9", class: "bg-red-50 border-red-200" },
-                          { device: "NBI001", status: "2 failures on Jun 4, Jun 9", class: "bg-red-50 border-red-200" },
-                          { device: "LAG001", status: "1 failure on Jun 6", class: "bg-yellow-50 border-yellow-200" },
-                          { device: "CAI001", status: "1 failure on Jun 7", class: "bg-yellow-50 border-yellow-200" },
-                        ].map((item) => (
-                          <div key={item.device} className={`p-2 border rounded-md ${item.class}`}>
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">{item.device}</span>
-                              <span>{item.status}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
+           
+             
+                <TabsContent value="data-transmission" className="space-y-4">
+                {/* Replace the static content with the dynamic component */}
+                <DataTransmissionAnalysis timeRange={timeRange} />
+              </TabsContent>
 
             <TabsContent value="performance" className="space-y-4">
               <Card className="lg:col-span-2">
