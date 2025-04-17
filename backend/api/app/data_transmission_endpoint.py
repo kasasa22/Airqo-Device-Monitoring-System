@@ -12,14 +12,14 @@ from app.utils import create_json_response
 # Create router for data transmission analytics
 router = APIRouter(prefix="/api/analytics", tags=["data-analytics"])
 
-@router.get("/device-transmission")
+@router.get("/device-transmission", response_model=List[Dict[str, Any]])
 def get_device_transmission(
     start_date: Optional[datetime] = Query(None),
     end_date: Optional[datetime] = Query(None),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> List[Dict[str, Any]]:
     try:
-        # Use default date range of 7 days if not provided
+        # Use default 7-day range if no dates are provided
         if not start_date or not end_date:
             end_date = datetime.utcnow()
             start_date = end_date - timedelta(days=6)
@@ -54,7 +54,7 @@ def get_device_transmission(
                 GROUP BY DATE_TRUNC('day', r.timestamp)::date, r.device_key
             )
             SELECT 
-                dd.date::text,
+                dd.date::text AS date,
                 json_object_agg(
                     dd.device_id, 
                     CASE WHEN rpd.reading_count > 0 THEN 100 ELSE 0 END
@@ -66,11 +66,13 @@ def get_device_transmission(
             ORDER BY dd.date;
         """)
 
-        result = db.execute(query, {"start_date": start_date, "end_date": end_date}).fetchall()
+        result = db.execute(query, {"start_date": start_date, "end_date": end_date}).mappings().all()
 
-        # Transform result into JSON serializable response
         transmission_data = [
-            {"date": row["date"], "device_data": row["device_data"]}
+            {
+                "date": row["date"],
+                "device_data": row["device_data"]
+            }
             for row in result
         ]
 
@@ -79,6 +81,7 @@ def get_device_transmission(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch device transmission data: {e}")
     
+       
 @router.get("/data-volume")
 def get_data_volume(
     timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
