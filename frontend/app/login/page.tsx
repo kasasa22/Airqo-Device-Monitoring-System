@@ -40,7 +40,7 @@ export default function LoginPage() {
       formData.append('password', password);
 
       // Make API call to your FastAPI authentication endpoint
-      const response = await fetch(`${config.apiUrl}/login`, {
+      const response = await fetch(`http://srv792913.hstgr.cloud:8000/login`, {
         method: "POST",
         body: formData,
       });
