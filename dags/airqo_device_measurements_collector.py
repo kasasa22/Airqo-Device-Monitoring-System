@@ -427,7 +427,7 @@ with DAG(
             reading_key SERIAL PRIMARY KEY,
             device_key INTEGER REFERENCES dim_device(device_key),
             site_key INTEGER REFERENCES dim_site(site_key),
-            timestamp TIMESTAMP NOT NULL,
+           timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
             device_name VARCHAR(100),
             pm2_5 DECIMAL(10, 5),
             pm10 DECIMAL(10, 5),

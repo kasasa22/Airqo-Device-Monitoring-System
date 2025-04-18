@@ -8,6 +8,9 @@ import os
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from decimal import Decimal
+ 
+from datetime import datetime, timezone
+from dateutil import tz
 
 import json
 import math
@@ -1034,9 +1037,7 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
         if not device_row:
             raise HTTPException(status_code=404, detail=f"Device with ID {device_id} not found")
         
-        # Import timezone libraries
-        from datetime import datetime, timezone
-        from dateutil import tz
+       
         
         # Get the EAT timezone
         eat_timezone = tz.gettz('Africa/Kampala')
