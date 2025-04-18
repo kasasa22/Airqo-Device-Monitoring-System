@@ -165,28 +165,11 @@ export default function DashboardPage() {
       : 0;
   };
 
-  const DeviceMaintenanceCard = () => {
-    const [metrics, setMetrics] = useState({
-      upcoming_maintenance: 0,
-      overdue_maintenance: 0,
-    });
-
   const activePercentage = calculatePercentage(deviceCounts.active_devices);
   const offlinePercentage = calculatePercentage(deviceCounts.offline_devices);
   const deployedPercentage = calculatePercentage(deviceCounts.deployed_devices);
   const notDeployedPercentage = calculatePercentage(deviceCounts.not_deployed);
   const recalledPercentage = calculatePercentage(deviceCounts.recalled_devices);
-
-  useEffect(() => {
-    fetch(`${config.apiUrl}/maintenance-metrics`)
-      .then((res) => res.json())
-      .then((data) => {
-        setMetrics(data);
-      })
-      .catch((err) => {
-        console.error("Error fetching maintenance metrics:", err);
-      });
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -321,77 +304,38 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <Card className="hover:shadow-md transition-shadow overflow-hidden">
-      <Card>
-      <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
-        <CardTitle className="flex items-center">
-          <PieChart className="mr-2 h-5 w-5 text-primary" />
-          Device Maintenance Needs
-        </CardTitle>
-        <CardDescription>Current maintenance requirements by category</CardDescription>
-      </CardHeader>
-      <CardContent className="p-4">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center">
-              <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center mr-3">
-                <Battery className="h-5 w-5 text-red-500" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Battery Replacement</p>
-                <p className="text-xl font-semibold">{metrics.overdue_maintenance} devices</p>
-              </div>
+        <Card className="hover:shadow-md transition-shadow overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
+            <CardTitle className="flex items-center">
+              <BarChart3 className="mr-2 h-5 w-5 text-primary" />
+              Device Failure Patterns
+            </CardTitle>
+            <CardDescription>Monthly breakdown of device failure causes</CardDescription>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsBarChart data={deviceFailureData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="powerIssues" name="Power Issues" fill="#8884d8" />
+                  <Bar dataKey="sensorFailures" name="Sensor Failures" fill="#82ca9d" />
+                  <Bar dataKey="connectivityIssues" name="Connectivity Issues" fill="#ffc658" />
+                  <Bar dataKey="physicalDamage" name="Physical Damage" fill="#ff8042" />
+                </RechartsBarChart>
+              </ResponsiveContainer>
             </div>
-            <Badge className="bg-red-500">Urgent</Badge>
-          </div>
-
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center">
-              <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center mr-3">
-                <Zap className="h-5 w-5 text-yellow-500" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Sensor Calibration</p>
-                <p className="text-xl font-semibold">12 devices</p> {/* Placeholder */}
-              </div>
+          </CardContent>
+          <CardFooter className="bg-gray-50 border-t px-4 py-3">
+            <div className="flex items-center text-sm text-muted-foreground">
+              <Activity className="mr-2 h-4 w-4 text-primary" />
+              Connectivity issues are the leading cause of device failures
             </div>
-            <Badge className="bg-yellow-500">Medium</Badge>
-          </div>
-
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center">
-              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                <Wifi className="h-5 w-5 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Connectivity Issues</p>
-                <p className="text-xl font-semibold">5 devices</p> {/* Placeholder */}
-              </div>
-            </div>
-            <Badge className="bg-blue-500">Scheduled</Badge>
-          </div>
-
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center">
-              <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center mr-3">
-                <Settings className="h-5 w-5 text-green-500" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Routine Maintenance</p>
-                <p className="text-xl font-semibold">{metrics.upcoming_maintenance} device{metrics.upcoming_maintenance !== 1 ? "s" : ""}</p>
-              </div>
-            </div>
-            <Badge className="bg-green-500">Planned</Badge>
-          </div>
-        </div>
-      </CardContent>
-      <CardFooter className="bg-gray-50 border-t px-4 py-3">
-        <div className="flex items-center text-sm text-muted-foreground">
-          <Wrench className="mr-2 h-4 w-4 text-primary" />
-          {metrics.upcoming_maintenance} device{metrics.upcoming_maintenance !== 1 ? "s" : ""} require maintenance in the next 30 days
-        </div>
-      </CardFooter>
-    </Card>
+          </CardFooter>
+        </Card>
 
         <Card className="hover:shadow-md transition-shadow overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
@@ -668,32 +612,70 @@ export default function DashboardPage() {
         <Card className="hover:shadow-md transition-shadow overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
             <CardTitle className="flex items-center">
-              <BarChart3 className="mr-2 h-5 w-5 text-primary" />
-              Device Failure Patterns
+              <PieChart className="mr-2 h-5 w-5 text-primary" />
+              Device Maintenance Needs
             </CardTitle>
-            <CardDescription>Monthly breakdown of device failure causes</CardDescription>
+            <CardDescription>Current maintenance requirements by category</CardDescription>
           </CardHeader>
           <CardContent className="p-4">
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsBarChart data={deviceFailureData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="powerIssues" name="Power Issues" fill="#8884d8" />
-                  <Bar dataKey="sensorFailures" name="Sensor Failures" fill="#82ca9d" />
-                  <Bar dataKey="connectivityIssues" name="Connectivity Issues" fill="#ffc658" />
-                  <Bar dataKey="physicalDamage" name="Physical Damage" fill="#ff8042" />
-                </RechartsBarChart>
-              </ResponsiveContainer>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center">
+                  <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center mr-3">
+                    <Battery className="h-5 w-5 text-red-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Battery Replacement</p>
+                    <p className="text-xl font-semibold">8 devices</p>
+                  </div>
+                </div>
+                <Badge className="bg-red-500">Urgent</Badge>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center">
+                  <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center mr-3">
+                    <Zap className="h-5 w-5 text-yellow-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Sensor Calibration</p>
+                    <p className="text-xl font-semibold">12 devices</p>
+                  </div>
+                </div>
+                <Badge className="bg-yellow-500">Medium</Badge>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center">
+                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                    <Wifi className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Connectivity Issues</p>
+                    <p className="text-xl font-semibold">5 devices</p>
+                  </div>
+                </div>
+                <Badge className="bg-blue-500">Scheduled</Badge>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center">
+                  <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center mr-3">
+                    <Settings className="h-5 w-5 text-green-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Routine Maintenance</p>
+                    <p className="text-xl font-semibold">15 devices</p>
+                  </div>
+                </div>
+                <Badge className="bg-green-500">Planned</Badge>
+              </div>
             </div>
           </CardContent>
           <CardFooter className="bg-gray-50 border-t px-4 py-3">
             <div className="flex items-center text-sm text-muted-foreground">
-              <Activity className="mr-2 h-4 w-4 text-primary" />
-              Connectivity issues are the leading cause of device failures
+              <Wrench className="mr-2 h-4 w-4 text-primary" />
+              20 devices require maintenance in the next 30 days
             </div>
           </CardFooter>
         </Card>
