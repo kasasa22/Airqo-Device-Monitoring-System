@@ -472,17 +472,6 @@ with DAG(
     tags=['airqo', 'device-monitoring', 'status-changes'],
 ) as dag:
     
-    # In device_status_monitoring_dag.py
-    wait_for_measurements = ExternalTaskSensor(
-        task_id='wait_for_measurements_collection',
-        external_dag_id='airqo_device_measurements_collector',
-        external_task_id='store_measurements',
-        execution_delta=timedelta(minutes=30),  # Look for runs within last 30 mins
-        timeout=3600,
-        poke_interval=60,
-        mode='poke',
-    )
-    
     # Create necessary tables for device status monitoring
     setup_tables = PostgresOperator(
         task_id='setup_monitoring_tables',
@@ -551,8 +540,6 @@ with DAG(
         task_id='update_device_metrics',
         python_callable=update_device_metrics,
     )
-    
-    # Set up task dependencies
-    wait_for_measurements >> setup_tables
+   
     setup_tables >> [missing_data_task, status_changes_task, inactive_deployed_task]
     [missing_data_task, status_changes_task, inactive_deployed_task] >> update_metrics_task
