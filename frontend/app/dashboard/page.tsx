@@ -165,11 +165,28 @@ export default function DashboardPage() {
       : 0;
   };
 
+  const DeviceMaintenanceCard = () => {
+    const [metrics, setMetrics] = useState({
+      upcoming_maintenance: 0,
+      overdue_maintenance: 0,
+    });
+
   const activePercentage = calculatePercentage(deviceCounts.active_devices);
   const offlinePercentage = calculatePercentage(deviceCounts.offline_devices);
   const deployedPercentage = calculatePercentage(deviceCounts.deployed_devices);
   const notDeployedPercentage = calculatePercentage(deviceCounts.not_deployed);
   const recalledPercentage = calculatePercentage(deviceCounts.recalled_devices);
+
+  useEffect(() => {
+    fetch(`${config.apiUrl}/maintenance-metrics`)
+      .then((res) => res.json())
+      .then((data) => {
+        setMetrics(data);
+      })
+      .catch((err) => {
+        console.error("Error fetching maintenance metrics:", err);
+      });
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -305,6 +322,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <Card className="hover:shadow-md transition-shadow overflow-hidden">
+      <Card>
       <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b">
         <CardTitle className="flex items-center">
           <PieChart className="mr-2 h-5 w-5 text-primary" />
@@ -321,7 +339,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-500">Battery Replacement</p>
-                <p className="text-xl font-semibold">8 devices</p>
+                <p className="text-xl font-semibold">{metrics.overdue_maintenance} devices</p>
               </div>
             </div>
             <Badge className="bg-red-500">Urgent</Badge>
@@ -334,7 +352,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-500">Sensor Calibration</p>
-                <p className="text-xl font-semibold">12 devices</p>
+                <p className="text-xl font-semibold">12 devices</p> {/* Placeholder */}
               </div>
             </div>
             <Badge className="bg-yellow-500">Medium</Badge>
@@ -347,7 +365,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-500">Connectivity Issues</p>
-                <p className="text-xl font-semibold">5 devices</p>
+                <p className="text-xl font-semibold">5 devices</p> {/* Placeholder */}
               </div>
             </div>
             <Badge className="bg-blue-500">Scheduled</Badge>
@@ -360,7 +378,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-500">Routine Maintenance</p>
-                <p className="text-xl font-semibold">15 devices</p>
+                <p className="text-xl font-semibold">{metrics.upcoming_maintenance} device{metrics.upcoming_maintenance !== 1 ? "s" : ""}</p>
               </div>
             </div>
             <Badge className="bg-green-500">Planned</Badge>
@@ -370,7 +388,7 @@ export default function DashboardPage() {
       <CardFooter className="bg-gray-50 border-t px-4 py-3">
         <div className="flex items-center text-sm text-muted-foreground">
           <Wrench className="mr-2 h-4 w-4 text-primary" />
-          20 devices require maintenance in the next 30 days
+          {metrics.upcoming_maintenance} device{metrics.upcoming_maintenance !== 1 ? "s" : ""} require maintenance in the next 30 days
         </div>
       </CardFooter>
     </Card>
