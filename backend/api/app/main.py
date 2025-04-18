@@ -1034,38 +1034,55 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
         if not device_row:
             raise HTTPException(status_code=404, detail=f"Device with ID {device_id} not found")
         
-        # Directly convert row to dict without any type checking
+        # Import timezone libraries
+        from datetime import datetime, timezone
+        from dateutil import tz
+        
+        # Get the EAT timezone
+        eat_timezone = tz.gettz('Africa/Kampala')
+        
+        # Function to convert timestamps to EAT
+        def convert_to_eat(timestamp):
+            if timestamp is None:
+                return None
+                
+            # If timestamp has no timezone info, assume it's UTC
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
+                
+            # Convert to EAT timezone
+            eat_time = timestamp.astimezone(eat_timezone)
+            return eat_time.isoformat()
+        
+        # Convert row to dictionary with timezone conversion
         raw_device_dict = {}
         for column, value in device_row._mapping.items():
             raw_device_dict[column] = value
             
-        # Build a safe version of the device data
+        # Process data with timezone conversion
         device_dict = {}
         for key, value in raw_device_dict.items():
-            # Skip None values
             if value is None:
                 device_dict[key] = None
                 continue
                 
-            # Handle different types without using isinstance
+            # Handle different types
             try:
-                # Try to convert to float (will work for Decimal and numeric types)
+                # Try to convert to float
                 float_val = float(value)
-                # Check if NaN
-                if float_val != float_val:  # NaN check without math.isnan
+                if float_val != float_val:  # NaN check
                     device_dict[key] = None
                 else:
                     device_dict[key] = float_val
             except (TypeError, ValueError):
-                # If conversion to float fails, try datetime
+                # If conversion to float fails, check for datetime
                 try:
                     if hasattr(value, 'isoformat'):
-                        device_dict[key] = value.isoformat()
+                        # Convert datetime to EAT
+                        device_dict[key] = convert_to_eat(value)
                     else:
-                        # For strings and other types
                         device_dict[key] = str(value)
                 except:
-                    # Last resort
                     device_dict[key] = str(value)
         
         # Get maintenance history
@@ -1102,12 +1119,10 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
         maintenance_history = []
         
         for row in history_result:
-            # Convert each row to dict without type checking
             raw_history_dict = {}
             for column, value in row._mapping.items():
                 raw_history_dict[column] = value
                 
-            # Build a safe version
             history_dict = {}
             for key, value in raw_history_dict.items():
                 if value is None:
@@ -1116,14 +1131,15 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
                     
                 try:
                     float_val = float(value)
-                    if float_val != float_val:  # NaN check without math.isnan
+                    if float_val != float_val:
                         history_dict[key] = None
                     else:
                         history_dict[key] = float_val
                 except (TypeError, ValueError):
                     try:
                         if hasattr(value, 'isoformat'):
-                            history_dict[key] = value.isoformat()
+                            # Convert datetime to EAT
+                            history_dict[key] = convert_to_eat(value)
                         else:
                             history_dict[key] = str(value)
                     except:
@@ -1131,7 +1147,7 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
                         
             maintenance_history.append(history_dict)
         
-        # Get readings history
+        # Get all readings history (no LIMIT)
         readings_history_query = text("""
             SELECT 
                 timestamp,
@@ -1142,19 +1158,16 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
             FROM fact_device_readings
             WHERE device_key = :device_key
             ORDER BY timestamp DESC
-       
         """)
         
         readings_result = db.execute(readings_history_query, {"device_key": raw_device_dict.get('device_key')})
         readings_history = []
         
         for row in readings_result:
-            # Convert each row to dict without type checking
             raw_reading_dict = {}
             for column, value in row._mapping.items():
                 raw_reading_dict[column] = value
                 
-            # Build a safe version
             reading_dict = {}
             for key, value in raw_reading_dict.items():
                 if value is None:
@@ -1163,14 +1176,15 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
                     
                 try:
                     float_val = float(value)
-                    if float_val != float_val:  # NaN check without math.isnan
+                    if float_val != float_val:
                         reading_dict[key] = None
                     else:
                         reading_dict[key] = float_val
                 except (TypeError, ValueError):
                     try:
                         if hasattr(value, 'isoformat'):
-                            reading_dict[key] = value.isoformat()
+                            # Convert datetime to EAT
+                            reading_dict[key] = convert_to_eat(value)
                         else:
                             reading_dict[key] = str(value)
                     except:
@@ -1226,25 +1240,25 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
                 "aqi_color": str(device_dict.get("aqi_color", "")) if device_dict.get("aqi_color") is not None else None
             },
             "maintenance_history": maintenance_history,
-            "readings_history": readings_history
+            "readings_history": readings_history,
+            "timezone": "Africa/Kampala (EAT)"  # Added to indicate timezone used
         }
         
-        # Custom JSON encoder function without using isinstance
+        # Custom JSON encoder for any remaining datetime objects
         def safe_json_encoder(obj):
             try:
-                # Try standard json serialization
                 json.dumps(obj)
                 return obj
             except:
-                # If that fails, try to convert the object to a string
                 try:
-                    if hasattr(obj, 'isoformat'):  # Handle datetime objects
-                        return obj.isoformat()
+                    if hasattr(obj, 'isoformat'):
+                        # Convert datetime to EAT
+                        return convert_to_eat(obj)
                     return str(obj)
                 except:
                     return None
         
-        # Use a simpler approach - convert to string first then parse back
+        # Convert to JSON with custom encoder
         json_str = json.dumps(response, default=safe_json_encoder)
         safe_response = json.loads(json_str)
         
@@ -1254,8 +1268,7 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
         raise
     except Exception as e:
         print(f"Error in get_device_detail: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch device details: {str(e)}")
-        
+        raise HTTPException(status_code=500, detail=f"Failed to fetch device details: {str(e)}")    
 
 @app.get("/health-tips/device/{device_id}")
 def get_health_tips_by_device(device_id: str, db=Depends(get_db)):
