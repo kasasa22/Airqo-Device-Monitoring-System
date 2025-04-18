@@ -1142,7 +1142,7 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
             FROM fact_device_readings
             WHERE device_key = :device_key
             ORDER BY timestamp DESC
-            LIMIT 20
+       
         """)
         
         readings_result = db.execute(readings_history_query, {"device_key": raw_device_dict.get('device_key')})
