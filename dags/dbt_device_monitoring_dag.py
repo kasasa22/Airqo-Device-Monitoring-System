@@ -472,13 +472,14 @@ with DAG(
     tags=['airqo', 'device-monitoring', 'status-changes'],
 ) as dag:
     
-    # Ensure the DAG waits for the measurements collector to complete
+    # In device_status_monitoring_dag.py
     wait_for_measurements = ExternalTaskSensor(
         task_id='wait_for_measurements_collection',
         external_dag_id='airqo_device_measurements_collector',
-        external_task_id='store_measurements',  # Wait for this specific task
-        timeout=3600,  # 1 hour timeout
-        poke_interval=60,  # Check every minute
+        external_task_id='store_measurements',
+        execution_delta=timedelta(minutes=30),  # Look for runs within last 30 mins
+        timeout=3600,
+        poke_interval=60,
         mode='poke',
     )
     
