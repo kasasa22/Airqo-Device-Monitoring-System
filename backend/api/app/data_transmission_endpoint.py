@@ -102,6 +102,8 @@ def get_device_transmission(
     except Exception as e:
         print(f"Error in get_device_transmission: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch device transmission data: {str(e)}")
+
+
 @router.get("/data-volume")
 def get_data_volume(
     timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
