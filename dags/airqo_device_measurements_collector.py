@@ -8,6 +8,8 @@ import json
 import os
 from airflow.models import Variable
 import time
+from datetime import datetime, timedelta, timezone
+import pytz
 
 # Default arguments for the DAG
 default_args = {
@@ -183,6 +185,11 @@ def store_measurements(**kwargs):
     skipped_count = 0
     
     try:
+        # Set the timezone for this database session to Kampala
+        cursor = connection.cursor()
+        cursor.execute("SET timezone = 'Africa/Kampala';")
+        cursor.close()
+        
         for device_data in all_measurements:
             device_id = device_data['device_id']
             response_data = device_data['data']
@@ -209,14 +216,21 @@ def store_measurements(**kwargs):
                     if not timestamp_str:
                         continue
                     
-                    # Parse timestamp
+                    # Parse timestamp and ensure it's timezone-aware (UTC)
                     try:
+                        # If timestamp has ISO format with Z (UTC)
                         timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
                     except:
                         try:
+                            # If timestamp has microseconds format with Z
                             timestamp = datetime.strptime(timestamp_str, "%Y-%m-%dT%H:%M:%S.%fZ")
+                            # Make it timezone-aware (UTC)
+                            timestamp = timestamp.replace(tzinfo=timezone.utc)
                         except:
+                            # If timestamp has seconds format with Z
                             timestamp = datetime.strptime(timestamp_str, "%Y-%m-%dT%H:%M:%SZ")
+                            # Make it timezone-aware (UTC)
+                            timestamp = timestamp.replace(tzinfo=timezone.utc)
                     
                     # Extract measurements data
                     pm2_5 = measurement.get('pm2_5', {}).get('value')
@@ -264,6 +278,9 @@ def store_measurements(**kwargs):
                         skipped_count += 1
                         continue
                     
+                    # Get current time in Kampala timezone for created_at/last_updated
+                    now_kampala = datetime.now(timezone.utc).astimezone(pytz.timezone('Africa/Kampala'))
+                    
                     # Insert site data if not exists or update if exists
                     if site_id:
                         cursor.execute(
@@ -299,7 +316,7 @@ def store_measurements(**kwargs):
                                 (
                                     site_name, location_name, search_name, village,
                                     town, city, district, country, data_provider,
-                                    site_category, datetime.now(), site_key
+                                    site_category, now_kampala, site_key
                                 )
                             )
                         else:
@@ -315,7 +332,7 @@ def store_measurements(**kwargs):
                                 (
                                     site_id, site_name, location_name, search_name, village,
                                     town, city, district, country, data_provider,
-                                    site_category, datetime.now(), datetime.now()
+                                    site_category, now_kampala, now_kampala
                                 )
                             )
                             site_key = cursor.fetchone()[0]
@@ -387,23 +404,26 @@ def store_measurements(**kwargs):
         raise
     finally:
         connection.close()
-
 # Create the DAG
 with DAG(
     'airqo_device_measurements_collector',
     default_args=default_args,
     description='Collect recent measurements from AirQo API for all devices',
-    schedule_interval=timedelta(minutes=30),  # Run every 30 minutes
+    schedule_interval=timedelta(minutes=60),  # Run every 60 minutes
     start_date=datetime(2025, 4, 1),
     catchup=False,
     tags=['airqo', 'measurements', 'api'],
 ) as dag:
     
     # Create necessary tables
+    # Create necessary tables
     setup_tables = PostgresOperator(
         task_id='setup_tables',
         postgres_conn_id='postgres_default',
         sql="""
+        -- Set timezone to Africa/Kampala for this session
+        SET timezone = 'Africa/Kampala';
+        
         -- Create site dimension table if not exists
         CREATE TABLE IF NOT EXISTS dim_site (
             site_key SERIAL PRIMARY KEY,
@@ -418,8 +438,8 @@ with DAG(
             country VARCHAR(100),
             data_provider VARCHAR(100),
             site_category VARCHAR(100),
-            created_at TIMESTAMP,
-            last_updated TIMESTAMP
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
         
         -- Modify fact_device_readings to store additional data
@@ -427,7 +447,7 @@ with DAG(
             reading_key SERIAL PRIMARY KEY,
             device_key INTEGER REFERENCES dim_device(device_key),
             site_key INTEGER REFERENCES dim_site(site_key),
-           timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+            timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
             device_name VARCHAR(100),
             pm2_5 DECIMAL(10, 5),
             pm10 DECIMAL(10, 5),
@@ -484,7 +504,6 @@ with DAG(
         ON fact_aqi_ranges(reading_key);
         """
     )
-    
     # Task to get device IDs
     get_device_ids_task = PythonOperator(
         task_id='get_device_ids',

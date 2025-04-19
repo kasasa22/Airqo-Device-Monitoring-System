@@ -10,6 +10,8 @@ import json
 import pandas as pd
 import os
 from airflow.models import Variable
+from datetime import datetime, timedelta, timezone
+import pytz
 
 # Try to load .env file if available
 try:
@@ -81,16 +83,18 @@ def fetch_device_metadata(**kwargs):
     except Exception as e:
         print(f"Error fetching device metadata: {str(e)}")
         raise
-
 def load_device_metadata_to_postgres(**kwargs):
     """
-    Load device metadata to PostgreSQL with improved timestamp handling
-    and transaction management.
+    Load device metadata to PostgreSQL with proper timezone handling for Kampala.
     """
     successful_devices = 0
     failed_devices = 0
     
     try:
+        # Set Kampala timezone
+        kampala_tz = pytz.timezone('Africa/Kampala')
+        now_kampala = datetime.now(timezone.utc).astimezone(kampala_tz)
+        
         # Check if active devices CSV exists
         import os
         if not os.path.exists('/tmp/airqo_active_devices.csv'):
@@ -126,6 +130,9 @@ def load_device_metadata_to_postgres(**kwargs):
                 conn.autocommit = False
                 cursor = conn.cursor()
                 
+                # Set the timezone for this database session
+                cursor.execute("SET timezone = 'Africa/Kampala';")
+                
                 # Extract core metadata
                 if not device_id:  # Skip if no device ID
                     print(f"Skipping row with missing device ID")
@@ -150,7 +157,11 @@ def load_device_metadata_to_postgres(**kwargs):
                         # Convert to datetime and handle NaT values
                         next_maintenance_dt = pd.to_datetime(row['nextMaintenance'])
                         if pd.notna(next_maintenance_dt):
-                            next_maintenance = next_maintenance_dt.to_pydatetime()
+                            # Make timezone-aware (UTC) then convert to Kampala
+                            if next_maintenance_dt.tzinfo is None:
+                                next_maintenance = next_maintenance_dt.tz_localize(timezone.utc).astimezone(kampala_tz)
+                            else:
+                                next_maintenance = next_maintenance_dt.astimezone(kampala_tz)
                     except Exception as e:
                         print(f"Warning: Could not parse nextMaintenance for device {device_id}: {e}")
                 
@@ -160,7 +171,11 @@ def load_device_metadata_to_postgres(**kwargs):
                         # Convert to datetime and handle NaT values
                         deployment_date_dt = pd.to_datetime(row['deployment_date'])
                         if pd.notna(deployment_date_dt):
-                            deployment_date = deployment_date_dt.to_pydatetime()
+                            # Make timezone-aware (UTC) then convert to Kampala
+                            if deployment_date_dt.tzinfo is None:
+                                deployment_date = deployment_date_dt.tz_localize(timezone.utc).astimezone(kampala_tz)
+                            else:
+                                deployment_date = deployment_date_dt.astimezone(kampala_tz)
                     except Exception as e:
                         print(f"Warning: Could not parse deployment_date for device {device_id}: {e}")
                 
@@ -188,7 +203,7 @@ def load_device_metadata_to_postgres(**kwargs):
                         is_active,
                         status,
                         is_online,
-                        datetime.now()
+                        now_kampala  # Using Kampala timezone
                     ])
                     
                     # Optional fields - only add if they exist
@@ -230,7 +245,7 @@ def load_device_metadata_to_postgres(**kwargs):
                 else:
                     # Insert new device
                     insert_fields = ["device_id", "device_name", "is_active", "status", "is_online", "first_seen", "last_updated"]
-                    insert_values = [device_id, device_name, is_active, status, is_online, datetime.now(), datetime.now()]
+                    insert_values = [device_id, device_name, is_active, status, is_online, now_kampala, now_kampala]  # Using Kampala timezone
                     
                     # Optional fields - only add if they exist
                     if network is not None:
@@ -311,8 +326,8 @@ def load_device_metadata_to_postgres(**kwargs):
                                     admin_level_division = grid.get('long_name')
                     
                     # Handle deployment_date for location separately to ensure it's a valid timestamp
-                    effective_from = deployment_date if deployment_date else datetime.now()
-                    recorded_at = datetime.now()
+                    effective_from = deployment_date if deployment_date else now_kampala  # Using Kampala timezone
+                    recorded_at = now_kampala  # Using Kampala timezone
                     
                     # Get mount_type and power_type from the device
                     mount_type = row.get('mountType')
@@ -373,7 +388,7 @@ def load_device_metadata_to_postgres(**kwargs):
                     placeholders = ", ".join(["%s"] * len(location_values))
                     
                     # Check if location exists for this device
-                    cursor.execute("SELECT location_key FROM dim_location WHERE device_key = %s", (device_key,))
+                    cursor.execute("SELECT location_key FROM dim_location WHERE device_key = %s AND is_active = true", (device_key,))
                     location_result = cursor.fetchone()
                     
                     if location_result:
@@ -406,7 +421,7 @@ def load_device_metadata_to_postgres(**kwargs):
                     """,
                     (
                         device_key,
-                        datetime.now(),
+                        now_kampala,  # Using Kampala timezone
                         is_online,
                         status
                     )
@@ -448,7 +463,6 @@ def load_device_metadata_to_postgres(**kwargs):
         print(f"Critical error in device metadata loading: {str(e)}")
         # Re-raise to mark task as failed
         raise
-
 # Function to check environment variables and return token for testing
 def print_env_vars(**kwargs):
     """Print environment variables for debugging"""
@@ -494,67 +508,69 @@ with DAG(
     
     # Database setup task
     setup_tables = PostgresOperator(
-        task_id='setup_tables',
-        postgres_conn_id='postgres_default',
-        sql="""
-        -- Dimension tables
-        CREATE TABLE IF NOT EXISTS dim_device (
-            device_key SERIAL PRIMARY KEY,
-            device_id VARCHAR(100) UNIQUE,
-            device_name VARCHAR(100),
-            network VARCHAR(50),
-            category VARCHAR(50),
-            is_active BOOLEAN,
-            status VARCHAR(50),
-            mount_type VARCHAR(50),
-            power_type VARCHAR(50),
-            height FLOAT,
-            next_maintenance TIMESTAMP,
-            first_seen TIMESTAMP,
-            last_updated TIMESTAMP
-        );
-        
-        CREATE TABLE IF NOT EXISTS dim_location (
-            location_key SERIAL PRIMARY KEY,
-            device_key INTEGER REFERENCES dim_device(device_key),
-            location_name VARCHAR(255),
-            search_name VARCHAR(255),
-            village VARCHAR(255),
-            latitude FLOAT,
-            longitude FLOAT,
-            admin_level_country VARCHAR(100),
-            admin_level_city VARCHAR(100),
-            admin_level_division VARCHAR(100),
-            site_category VARCHAR(100),
-            mount_type VARCHAR(50),
-            power_type VARCHAR(50),
-            site_id VARCHAR(100),
-            site_name VARCHAR(255),
-            deployment_date TIMESTAMP,
-            effective_from TIMESTAMP,
-            effective_to TIMESTAMP,
-            is_active BOOLEAN DEFAULT TRUE,
-            recorded_at TIMESTAMP
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_device_location ON dim_location(device_key, is_active);
-        
-        -- Fact tables
-        CREATE TABLE IF NOT EXISTS fact_device_status (
-            status_key SERIAL PRIMARY KEY,
-            device_key INTEGER REFERENCES dim_device(device_key),
-            timestamp TIMESTAMP,
-            is_online BOOLEAN,
-            device_status VARCHAR(50)
-        );
-        
-        -- Create indexes
-        CREATE INDEX IF NOT EXISTS idx_device_status_timestamp ON fact_device_status(timestamp);
-        CREATE INDEX IF NOT EXISTS idx_device_status_device_key ON fact_device_status(device_key);
-        CREATE INDEX IF NOT EXISTS idx_device_location ON dim_location(device_key, is_active);
-        """
-    )
+    task_id='setup_tables',
+    postgres_conn_id='postgres_default',
+    sql="""
+    -- Set timezone to Africa/Kampala for this session
+    SET timezone = 'Africa/Kampala';
     
+    -- Dimension tables
+    CREATE TABLE IF NOT EXISTS dim_device (
+        device_key SERIAL PRIMARY KEY,
+        device_id VARCHAR(100) UNIQUE,
+        device_name VARCHAR(100),
+        network VARCHAR(50),
+        category VARCHAR(50),
+        is_active BOOLEAN,
+        status VARCHAR(50),
+        mount_type VARCHAR(50),
+        power_type VARCHAR(50),
+        height FLOAT,
+        next_maintenance TIMESTAMP WITH TIME ZONE,
+        first_seen TIMESTAMP WITH TIME ZONE,
+        last_updated TIMESTAMP WITH TIME ZONE
+    );
+    
+    CREATE TABLE IF NOT EXISTS dim_location (
+        location_key SERIAL PRIMARY KEY,
+        device_key INTEGER REFERENCES dim_device(device_key),
+        location_name VARCHAR(255),
+        search_name VARCHAR(255),
+        village VARCHAR(255),
+        latitude FLOAT,
+        longitude FLOAT,
+        admin_level_country VARCHAR(100),
+        admin_level_city VARCHAR(100),
+        admin_level_division VARCHAR(100),
+        site_category VARCHAR(100),
+        mount_type VARCHAR(50),
+        power_type VARCHAR(50),
+        site_id VARCHAR(100),
+        site_name VARCHAR(255),
+        deployment_date TIMESTAMP WITH TIME ZONE,
+        effective_from TIMESTAMP WITH TIME ZONE,
+        effective_to TIMESTAMP WITH TIME ZONE,
+        is_active BOOLEAN DEFAULT TRUE,
+        recorded_at TIMESTAMP WITH TIME ZONE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_device_location ON dim_location(device_key, is_active);
+    
+    -- Fact tables
+    CREATE TABLE IF NOT EXISTS fact_device_status (
+        status_key SERIAL PRIMARY KEY,
+        device_key INTEGER REFERENCES dim_device(device_key),
+        timestamp TIMESTAMP WITH TIME ZONE,
+        is_online BOOLEAN,
+        device_status VARCHAR(50)
+    );
+    
+    -- Create indexes
+    CREATE INDEX IF NOT EXISTS idx_device_status_timestamp ON fact_device_status(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_device_status_device_key ON fact_device_status(device_key);
+    CREATE INDEX IF NOT EXISTS idx_device_location ON dim_location(device_key, is_active);
+    """
+)
     # Fetch device metadata
     fetch_device_metadata_task = PythonOperator(
         task_id='fetch_device_metadata',
