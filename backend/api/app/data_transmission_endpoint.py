@@ -18,7 +18,8 @@ def get_device_transmission(
 ):
     """
     Get data transmission status by device over time.
-    Returns a time series showing when devices successfully transmitted data by hour.
+    Returns a time series showing when devices successfully transmitted data by hour,
+    converted to East Africa Time (EAT) for Kampala, Uganda.
     """
     try:
         # Calculate date range based on timeRange parameter
@@ -35,11 +36,12 @@ def get_device_transmission(
             start_date = end_date - timedelta(days=7)
         
         # Query to get device transmission data with proper format by hour
+        # Using timezone conversion to EAT (UTC+3)
         query = text("""
             WITH hour_series AS (
                 SELECT generate_series(
-                    DATE_TRUNC('hour', CAST(:start_date AS TIMESTAMP)),
-                    DATE_TRUNC('hour', CAST(:end_date AS TIMESTAMP)),
+                    DATE_TRUNC('hour', CAST(:start_date AS TIMESTAMP) AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Kampala'),
+                    DATE_TRUNC('hour', CAST(:end_date AS TIMESTAMP) AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Kampala'),
                     INTERVAL '1 hour'
                 ) AS hour
             ),
@@ -50,14 +52,14 @@ def get_device_transmission(
             ),
             device_readings AS (
                 SELECT 
-                    DATE_TRUNC('hour', r.timestamp) AS reading_hour,
+                    DATE_TRUNC('hour', r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Kampala') AS reading_hour,
                     d.device_id,
                     d.device_name,
                     COUNT(r.reading_key) AS reading_count
                 FROM dim_device d
                 JOIN fact_device_readings r ON d.device_key = r.device_key
                 WHERE r.timestamp BETWEEN CAST(:start_date AS TIMESTAMP) AND CAST(:end_date AS TIMESTAMP)
-                GROUP BY DATE_TRUNC('hour', r.timestamp), d.device_id, d.device_name
+                GROUP BY DATE_TRUNC('hour', r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Kampala'), d.device_id, d.device_name
             )
             SELECT 
                 hs.hour::text AS hour,
@@ -95,15 +97,11 @@ def get_device_transmission(
             
             transmission_data.append(row_data)
         
-        # Ensure the latest hour is always at the end
-        # The query already orders by hour, so the last item should be the latest
-        
         return create_json_response(transmission_data)
     
     except Exception as e:
         print(f"Error in get_device_transmission: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch device transmission data: {str(e)}")
-
 @router.get("/data-volume")
 def get_data_volume(
     timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
