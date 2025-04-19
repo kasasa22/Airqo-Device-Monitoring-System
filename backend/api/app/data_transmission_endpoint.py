@@ -18,7 +18,7 @@ def get_device_transmission(
 ):
     """
     Get data transmission status by device over time.
-    Returns a time series showing when devices successfully transmitted data.
+    Returns a time series showing when devices successfully transmitted data by hour.
     """
     try:
         # Calculate date range based on timeRange parameter
@@ -34,14 +34,14 @@ def get_device_transmission(
         else:
             start_date = end_date - timedelta(days=7)
         
-        # Query to get device transmission data with proper format
+        # Query to get device transmission data with proper format by hour
         query = text("""
-            WITH date_series AS (
+            WITH hour_series AS (
                 SELECT generate_series(
-                    DATE_TRUNC('day', CAST(:start_date AS TIMESTAMP))::date,
-                    DATE_TRUNC('day', CAST(:end_date AS TIMESTAMP))::date,
-                    INTERVAL '1 day'
-                ) AS date
+                    DATE_TRUNC('hour', CAST(:start_date AS TIMESTAMP)),
+                    DATE_TRUNC('hour', CAST(:end_date AS TIMESTAMP)),
+                    INTERVAL '1 hour'
+                ) AS hour
             ),
             active_devices AS (
                 SELECT DISTINCT device_id, device_key, device_name
@@ -50,17 +50,17 @@ def get_device_transmission(
             ),
             device_readings AS (
                 SELECT 
-                    DATE_TRUNC('day', r.timestamp)::date AS reading_date,
+                    DATE_TRUNC('hour', r.timestamp) AS reading_hour,
                     d.device_id,
                     d.device_name,
                     COUNT(r.reading_key) AS reading_count
                 FROM dim_device d
                 JOIN fact_device_readings r ON d.device_key = r.device_key
                 WHERE r.timestamp BETWEEN CAST(:start_date AS TIMESTAMP) AND CAST(:end_date AS TIMESTAMP)
-                GROUP BY DATE_TRUNC('day', r.timestamp)::date, d.device_id, d.device_name
+                GROUP BY DATE_TRUNC('hour', r.timestamp), d.device_id, d.device_name
             )
             SELECT 
-                ds.date::text AS date,
+                hs.hour::text AS hour,
                 json_object_agg(
                     ad.device_id, 
                     CASE 
@@ -68,13 +68,13 @@ def get_device_transmission(
                         ELSE 0 
                     END
                 ) AS device_data
-            FROM date_series ds
+            FROM hour_series hs
             CROSS JOIN active_devices ad
             LEFT JOIN device_readings dr 
-                ON dr.reading_date = ds.date
+                ON dr.reading_hour = hs.hour
                 AND dr.device_id = ad.device_id
-            GROUP BY ds.date
-            ORDER BY ds.date;
+            GROUP BY hs.hour
+            ORDER BY hs.hour;
         """)
         
         result = db.execute(query, {"start_date": start_date, "end_date": end_date}).fetchall()
@@ -82,11 +82,11 @@ def get_device_transmission(
         # Process the results into a format suitable for the frontend chart
         transmission_data = []
         for row in result:
-            date_str = row[0]
+            hour_str = row[0]
             device_data = row[1] if row[1] else {}
             
-            # Create a row with the date and device values
-            row_data = {"date": date_str}
+            # Create a row with the hour and device values
+            row_data = {"hour": hour_str}
             
             # Add device data
             if isinstance(device_data, dict):
@@ -94,6 +94,9 @@ def get_device_transmission(
                     row_data[device_id] = value
             
             transmission_data.append(row_data)
+        
+        # Ensure the latest hour is always at the end
+        # The query already orders by hour, so the last item should be the latest
         
         return create_json_response(transmission_data)
     
