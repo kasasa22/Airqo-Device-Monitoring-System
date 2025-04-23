@@ -238,6 +238,7 @@ def get_hourly_transmission(db: Session = Depends(get_db)):
         print(f"Error in get_hourly_transmission: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch hourly transmission data: {str(e)}")    
 
+
 @router.get("/all-devices-transmission")
 def get_all_devices_transmission(
     date: str = Query(None, description="Date in YYYY-MM-DD format (defaults to today)"),
@@ -246,20 +247,22 @@ def get_all_devices_transmission(
     """
     Get hourly data transmission for all devices on a specific date.
     Returns data count by hour showing transmission completeness across the network.
-    All times are converted to East African Time (Kampala - UTC+3).
+    All times are normalized to East African Time (Kampala - UTC+3), regardless of the
+    device's actual geographical location or timezone.
     """
     try:
-        # Set the East African Time zone (Kampala)
+        # Set the East African Time zone (Kampala) - this is our reference timezone
         kampala_tz = pytz.timezone('Africa/Kampala')
         
         # If no date provided, use today's date in Kampala time
         if date:
+            # Parse the date string as a date in Kampala time
             target_date = datetime.strptime(date, "%Y-%m-%d").date()
         else:
+            # Get current date in Kampala time
             target_date = datetime.now(kampala_tz).date()
         
         # Calculate start and end timestamps for the day in Kampala time
-        # Then convert to UTC for database query
         start_local = datetime.combine(target_date, datetime.min.time())
         end_local = datetime.combine(target_date, datetime.max.time())
         
@@ -267,7 +270,7 @@ def get_all_devices_transmission(
         start_kampala = kampala_tz.localize(start_local)
         end_kampala = kampala_tz.localize(end_local)
         
-        # Convert to UTC for database comparison
+        # Convert to UTC for database comparison - all device timestamps are stored in UTC
         start_timestamp = start_kampala.astimezone(pytz.UTC)
         end_timestamp = end_kampala.astimezone(pytz.UTC)
         
@@ -337,7 +340,8 @@ def get_all_devices_transmission(
         
         summary = {
             "date": target_date.isoformat(),
-            "timezone": "Africa/Kampala (EAT)",
+            "timezone": "Africa/Kampala (EAT, UTC+3)",
+            "note": "All device data normalized to Kampala time regardless of device location",
             "totalActualReadings": total_actual,
             "totalExpectedReadings": total_expected,
             "overallCompleteness": round(overall_completeness, 1),
@@ -350,8 +354,7 @@ def get_all_devices_transmission(
     
     except Exception as e:
         print(f"Error in get_all_devices_transmission: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch all devices transmission data: {str(e)}")
-    
+        raise HTTPException(status_code=500, detail=f"Failed to fetch all devices transmission data: {str(e)}") 
 
 @router.get("/device-failures")
 def get_device_failures(
