@@ -245,14 +245,30 @@ def get_all_devices_transmission(
     """
     Get hourly data transmission for all devices on a specific date.
     Returns data count by hour showing transmission completeness across the network.
+    All times are converted to East African Time (Kampala - UTC+3).
     """
     try:
-        # If no date provided, use today's date
-        target_date = datetime.strptime(date, "%Y-%m-%d").date() if date else datetime.utcnow().date()
+        # Set the East African Time zone (Kampala)
+        kampala_tz = pytz.timezone('Africa/Kampala')
         
-        # Calculate start and end timestamps for the day (in UTC)
-        start_timestamp = datetime.combine(target_date, datetime.min.time())
-        end_timestamp = datetime.combine(target_date, datetime.max.time())
+        # If no date provided, use today's date in Kampala time
+        if date:
+            target_date = datetime.strptime(date, "%Y-%m-%d").date()
+        else:
+            target_date = datetime.now(kampala_tz).date()
+        
+        # Calculate start and end timestamps for the day in Kampala time
+        # Then convert to UTC for database query
+        start_local = datetime.combine(target_date, datetime.min.time())
+        end_local = datetime.combine(target_date, datetime.max.time())
+        
+        # Localize to Kampala time
+        start_kampala = kampala_tz.localize(start_local)
+        end_kampala = kampala_tz.localize(end_local)
+        
+        # Convert to UTC for database comparison
+        start_timestamp = start_kampala.astimezone(pytz.UTC)
+        end_timestamp = end_kampala.astimezone(pytz.UTC)
         
         # Query to get hourly data for all active devices
         query = text("""
@@ -301,7 +317,7 @@ def get_all_devices_transmission(
             # Calculate completeness percentage
             completeness_pct = (actual_readings / expected_readings * 100) if expected_readings > 0 else 0
             
-            # Format hour as "HH:00" string
+            # Format hour as "HH:00" string in Kampala time
             hour_str = f"{hour:02d}:00"
             
             hourly_data.append({
@@ -320,6 +336,7 @@ def get_all_devices_transmission(
         
         summary = {
             "date": target_date.isoformat(),
+            "timezone": "Africa/Kampala (EAT)",
             "totalActualReadings": total_actual,
             "totalExpectedReadings": total_expected,
             "overallCompleteness": round(overall_completeness, 1),
@@ -333,6 +350,8 @@ def get_all_devices_transmission(
     except Exception as e:
         print(f"Error in get_all_devices_transmission: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch all devices transmission data: {str(e)}")
+    
+    
 @router.get("/device-failures")
 def get_device_failures(
     timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
