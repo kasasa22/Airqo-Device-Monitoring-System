@@ -58,6 +58,7 @@ services:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
+      TZ: Africa/Kampala
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d
