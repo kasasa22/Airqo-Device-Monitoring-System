@@ -237,6 +237,102 @@ def get_hourly_transmission(db: Session = Depends(get_db)):
         print(f"Error in get_hourly_transmission: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch hourly transmission data: {str(e)}")    
 
+@router.get("/all-devices-transmission")
+def get_all_devices_transmission(
+    date: str = Query(None, description="Date in YYYY-MM-DD format (defaults to today)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get hourly data transmission for all devices on a specific date.
+    Returns data count by hour showing transmission completeness across the network.
+    """
+    try:
+        # If no date provided, use today's date
+        target_date = datetime.strptime(date, "%Y-%m-%d").date() if date else datetime.utcnow().date()
+        
+        # Calculate start and end timestamps for the day (in UTC)
+        start_timestamp = datetime.combine(target_date, datetime.min.time())
+        end_timestamp = datetime.combine(target_date, datetime.max.time())
+        
+        # Query to get hourly data for all active devices
+        query = text("""
+            WITH hour_series AS (
+                SELECT generate_series(0, 23) AS hour
+            ),
+            active_devices AS (
+                SELECT COUNT(*) as count
+                FROM dim_device
+                WHERE is_active = true AND status = 'deployed'
+            ),
+            hourly_readings AS (
+                SELECT 
+                    EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Kampala') AS hour,
+                    COUNT(*) AS reading_count,
+                    COUNT(DISTINCT device_key) AS active_device_count
+                FROM fact_device_readings
+                WHERE timestamp BETWEEN :start_timestamp AND :end_timestamp
+                GROUP BY EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Kampala')
+            )
+            SELECT 
+                hs.hour,
+                COALESCE(hr.reading_count, 0) AS actual_readings,
+                COALESCE(hr.active_device_count, 0) AS transmitting_devices,
+                (SELECT count FROM active_devices) AS total_devices,
+                (SELECT count FROM active_devices) * 1 AS expected_readings_per_hour
+            FROM hour_series hs
+            LEFT JOIN hourly_readings hr ON hs.hour = hr.hour
+            ORDER BY hs.hour
+        """)
+        
+        result = db.execute(query, {
+            "start_timestamp": start_timestamp,
+            "end_timestamp": end_timestamp
+        }).fetchall()
+        
+        # Process the results
+        hourly_data = []
+        for row in result:
+            hour = int(row[0])
+            actual_readings = row[1]
+            transmitting_devices = row[2]
+            total_devices = row[3]
+            expected_readings = row[4]
+            
+            # Calculate completeness percentage
+            completeness_pct = (actual_readings / expected_readings * 100) if expected_readings > 0 else 0
+            
+            # Format hour as "HH:00" string
+            hour_str = f"{hour:02d}:00"
+            
+            hourly_data.append({
+                "hour": hour_str,
+                "actualReadings": actual_readings,
+                "transmittingDevices": transmitting_devices,
+                "totalDevices": total_devices,
+                "expectedReadings": expected_readings,
+                "completenessPercentage": round(completeness_pct, 1)
+            })
+        
+        # Add summary statistics
+        total_actual = sum(item["actualReadings"] for item in hourly_data)
+        total_expected = sum(item["expectedReadings"] for item in hourly_data)
+        overall_completeness = (total_actual / total_expected * 100) if total_expected > 0 else 0
+        
+        summary = {
+            "date": target_date.isoformat(),
+            "totalActualReadings": total_actual,
+            "totalExpectedReadings": total_expected,
+            "overallCompleteness": round(overall_completeness, 1),
+            "maxDevicesHour": max(hourly_data, key=lambda x: x["transmittingDevices"])["hour"],
+            "minDevicesHour": min(hourly_data, key=lambda x: x["transmittingDevices"])["hour"],
+            "hourlyData": hourly_data
+        }
+        
+        return create_json_response(summary)
+    
+    except Exception as e:
+        print(f"Error in get_all_devices_transmission: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch all devices transmission data: {str(e)}")
 @router.get("/device-failures")
 def get_device_failures(
     timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
