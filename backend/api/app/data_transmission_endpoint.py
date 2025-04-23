@@ -238,7 +238,6 @@ def get_hourly_transmission(db: Session = Depends(get_db)):
         print(f"Error in get_hourly_transmission: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch hourly transmission data: {str(e)}")    
 
-
 @router.get("/all-devices-transmission")
 def get_all_devices_transmission(
     date: str = Query(None, description="Date in YYYY-MM-DD format (defaults to today)"),
@@ -262,9 +261,16 @@ def get_all_devices_transmission(
             # Get current date in Kampala time
             target_date = datetime.now(kampala_tz).date()
         
+        # Get current time in Kampala for validation
+        current_kampala = datetime.now(kampala_tz)
+        
         # Calculate start and end timestamps for the day in Kampala time
         start_local = datetime.combine(target_date, datetime.min.time())
         end_local = datetime.combine(target_date, datetime.max.time())
+        
+        # For today's date, limit the end time to the current time
+        if target_date == current_kampala.date():
+            end_local = datetime.combine(target_date, current_kampala.time())
         
         # Localize to Kampala time
         start_kampala = kampala_tz.localize(start_local)
@@ -311,8 +317,18 @@ def get_all_devices_transmission(
         
         # Process the results
         hourly_data = []
+        
+        # Get current hour in Kampala for validation
+        current_kampala = datetime.now(kampala_tz)
+        current_hour = current_kampala.hour
+        
         for row in result:
             hour = int(row[0])
+            
+            # Skip future hours for today's date
+            if target_date == current_kampala.date() and hour > current_hour:
+                continue
+                
             actual_readings = row[1]
             transmitting_devices = row[2]
             total_devices = row[3]
@@ -341,6 +357,7 @@ def get_all_devices_transmission(
         summary = {
             "date": target_date.isoformat(),
             "timezone": "Africa/Kampala (EAT, UTC+3)",
+            "currentTime": current_kampala.strftime("%H:%M"),
             "note": "All device data normalized to Kampala time regardless of device location",
             "totalActualReadings": total_actual,
             "totalExpectedReadings": total_expected,
