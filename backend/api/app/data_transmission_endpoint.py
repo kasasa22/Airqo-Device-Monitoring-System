@@ -292,12 +292,12 @@ def get_all_devices_transmission(
             ),
             hourly_readings AS (
                 SELECT 
-                    EXTRACT(HOUR FROM created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Kampala') AS hour,
+                    EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Kampala') AS hour,
                     COUNT(*) AS reading_count,
                     COUNT(DISTINCT device_key) AS active_device_count
                 FROM fact_device_readings
-                WHERE created_at BETWEEN :start_timestamp AND :end_timestamp
-                GROUP BY EXTRACT(HOUR FROM created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Kampala')
+                WHERE timestamp BETWEEN :start_timestamp AND :end_timestamp
+                GROUP BY EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Kampala')
             )
             SELECT 
                 hs.hour,
@@ -371,7 +371,8 @@ def get_all_devices_transmission(
     
     except Exception as e:
         print(f"Error in get_all_devices_transmission: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch all devices transmission data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch all devices transmission data: {str(e)}") 
+
 @router.get("/device-failures")
 def get_device_failures(
     timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
