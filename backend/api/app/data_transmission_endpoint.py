@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import json
+import pytz
 
 from app.database import get_db
 from app.utils import create_json_response
@@ -351,7 +352,7 @@ def get_all_devices_transmission(
         print(f"Error in get_all_devices_transmission: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch all devices transmission data: {str(e)}")
     
-    
+
 @router.get("/device-failures")
 def get_device_failures(
     timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
