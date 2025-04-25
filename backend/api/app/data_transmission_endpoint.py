@@ -198,46 +198,127 @@ def get_data_volume(
         print(f"Error in get_data_volume: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch data volume metrics: {str(e)}")
 
+def calculate_success_rate(data_volume, device_count):
+    """
+    Calculate success rate based on data volume and device count.
+    Assuming each device should send 1 reading per hour.
+    """
+    if device_count == 0:
+        return 0
+    
+    # Each device should send 1 reading per hour
+    expected_readings = device_count
+    
+    # Calculate success rate (cap at 100%)
+    if expected_readings == 0:
+        return 0
+    success_rate = min(100, (data_volume / expected_readings) * 100)
+    
+    return round(success_rate, 1)
+
 @router.get("/hourly-transmission")
-def get_hourly_transmission(db: Session = Depends(get_db)):
+def get_hourly_transmission(
+    date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format"),
+    timeRange: str = Query("7days", description="Time range: 7days, 30days, 90days, or year"),
+    device: Optional[str] = Query(None, description="Filter by specific device ID"),
+    db: Session = Depends(get_db)
+):
     """
     Get hourly data transmission patterns.
     Returns data volume and active device count by hour of day.
+    Parameters:
+    - date: Optional specific date in YYYY-MM-DD format
+    - timeRange: Time range (7days, 30days, 90days, year)
+    - device: Optional device ID to filter results
     """
     try:
-        # Using a different approach to avoid the parameter binding issue with ':00'
-        # The parameter binding is interpreting the colon in ':00' as a parameter
-        query = text("""
+        # Calculate date range based on parameters
+        end_date = datetime.utcnow()
+        
+        if date:
+            # Use specific date if provided
+            try:
+                target_date = datetime.strptime(date, "%Y-%m-%d").date()
+                start_date = datetime.combine(target_date, datetime.min.time())
+                end_date = datetime.combine(target_date, datetime.max.time())
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        else:
+            # Use timeRange to determine start date
+            if timeRange == "7days":
+                start_date = end_date - timedelta(days=7)
+            elif timeRange == "30days":
+                start_date = end_date - timedelta(days=30)
+            elif timeRange == "90days":
+                start_date = end_date - timedelta(days=90)
+            elif timeRange == "year":
+                start_date = end_date - timedelta(days=365)
+            else:
+                # Default to 7 days if invalid timeRange
+                start_date = end_date - timedelta(days=7)
+        
+        # Modified query to avoid the bind parameter issue with ':00'
+        # Use a different approach for constructing the hour string
+        base_query = """
             SELECT 
-                CONCAT(LPAD(EXTRACT(HOUR FROM timestamp)::text, 2, '0'), ' hours') AS hour_display,
+                EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Kampala') AS hour_num,
                 COUNT(*) AS data_volume,
                 COUNT(DISTINCT device_key) AS device_count
             FROM fact_device_readings
-            WHERE timestamp >= NOW() - INTERVAL '7 days'
-            GROUP BY EXTRACT(HOUR FROM timestamp)
-            ORDER BY EXTRACT(HOUR FROM timestamp)
-        """)
+            WHERE timestamp BETWEEN :start_date AND :end_date
+        """
         
-        result = db.execute(query).fetchall()
+        # Add device filter if specified
+        if device and device != "all":
+            base_query += """
+                AND device_key IN (
+                    SELECT device_key FROM dim_device 
+                    WHERE device_id = :device_id
+                )
+            """
+            
+        # Complete the query with grouping and ordering
+        base_query += """
+            GROUP BY EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Kampala')
+            ORDER BY EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Kampala')
+        """
+        
+        # Prepare query parameters
+        query_params = {
+            "start_date": start_date, 
+            "end_date": end_date
+        }
+        
+        if device and device != "all":
+            query_params["device_id"] = device
+            
+        # Execute the query
+        query = text(base_query)
+        result = db.execute(query, query_params).fetchall()
         
         # Process the results and format the hour string in Python instead of SQL
         hourly_data = []
         for row in result:
-            # The hour comes out as "XX hours", we'll reformat it to "XX:00"
-            hour_str = row[0].replace(' hours', ':00')
+            hour_num = int(row[0])
+            # Format hour as "HH:00" string
+            hour_str = f"{hour_num:02d}:00"
             
             hourly_data.append({
                 "hour": hour_str,
                 "dataVolume": row[1],
-                "devices": row[2]
+                "devices": row[2],
+                "successRate": calculate_success_rate(row[1], row[2])
             })
         
+        # Return the raw data without filling in missing hours
+        # This allows for analysis of data gaps
         return create_json_response(hourly_data)
     
     except Exception as e:
         print(f"Error in get_hourly_transmission: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch hourly transmission data: {str(e)}")    
+        raise HTTPException(status_code=500, detail=f"Failed to fetch hourly transmission data: {str(e)}")
 
+        
 @router.get("/all-devices-transmission")
 def get_all_devices_transmission(
     date: str = Query(None, description="Date in YYYY-MM-DD format (defaults to today)"),
