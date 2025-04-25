@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import { useState, useMemo } from "react"
+import { Progress } from "@/components/ui/progress"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -9,228 +10,1361 @@ import {
   Bar,
   LineChart,
   Line,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
-  AreaChart,
-  Area,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  ScatterChart,
-  Scatter,
-  ComposedChart,
-  ReferenceLine,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts"
 import {
   Download,
   RefreshCw,
-  Calendar,
-  BarChartIcon,
-  PieChartIcon,
   Activity,
-  Zap,
-  Battery,
-  Clock,
-  AlertTriangle,
-  Settings,
-  MapPin,
-  Wrench,
-  Timer,
-  TrendingUp,
-  TrendingDown,
-  Database,
-  WifiOff,
-  Info,
-  Share2,
-  Filter,
+  Globe,
+  Map,
+  Layers,
+  Signal,
+  SignalZero,
+  Percent,
+  Wind,
+  Search,
 } from "lucide-react"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import SiteAnalyticsPage from "./site_analysis"
-import DataTransmissionAnalysis from "./DataTransmissionAnalysis"
-
-// Sample data for device performance metrics
-const devicePerformanceData = [
-  { month: "Jan", uptime: 98.2, dataCompleteness: 96.5, batteryHealth: 95.0, signalStrength: 92.3 },
-  { month: "Feb", uptime: 97.8, dataCompleteness: 95.8, batteryHealth: 93.2, signalStrength: 91.5 },
-  { month: "Mar", uptime: 99.1, dataCompleteness: 97.2, batteryHealth: 91.5, signalStrength: 93.7 },
-  { month: "Apr", uptime: 98.5, dataCompleteness: 96.8, batteryHealth: 89.8, signalStrength: 92.1 },
-  { month: "May", uptime: 97.2, dataCompleteness: 94.5, batteryHealth: 87.3, signalStrength: 90.6 },
-  { month: "Jun", uptime: 98.7, dataCompleteness: 97.0, batteryHealth: 85.1, signalStrength: 91.8 },
-]
-
-// Sample data for failure analysis
-const failureTypeData = [
-  { name: "Power Issues", value: 35 },
-  { name: "Sensor Failures", value: 25 },
-  { name: "Connectivity Issues", value: 30 },
-  { name: "Physical Damage", value: 10 },
-]
-
-const failureColors = ["#8884d8", "#82ca9d", "#ffc658", "#ff8042"]
 
 // Sample data for regional comparison
 const regionalComparisonData = [
   {
     region: "East Africa",
     uptime: 98.5,
-    mtbf: 120,
-    mttr: 48,
-    failureRate: 8.2,
     deviceCount: 42,
+    pm25: 28.5,
+    pm10: 45.2,
+    dataCompleteness: 95.8,
+    onlineDevices: 38,
+    offlineDevices: 4,
+    countries: 5,
+    districts: 18,
+    aqiGood: 24,
+    aqiModerate: 14,
+    aqiUhfsg: 3,
+    aqiUnhealthy: 1,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 92.5,
   },
   {
     region: "West Africa",
     uptime: 96.2,
-    mtbf: 95,
-    mttr: 72,
-    failureRate: 12.5,
     deviceCount: 35,
+    pm25: 32.1,
+    pm10: 52.7,
+    dataCompleteness: 92.3,
+    onlineDevices: 30,
+    offlineDevices: 5,
+    countries: 4,
+    districts: 12,
+    aqiGood: 18,
+    aqiModerate: 12,
+    aqiUhfsg: 4,
+    aqiUnhealthy: 1,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 88.7,
   },
   {
     region: "North Africa",
     uptime: 99.1,
-    mtbf: 145,
-    mttr: 36,
-    failureRate: 5.8,
     deviceCount: 28,
+    pm25: 24.3,
+    pm10: 38.9,
+    dataCompleteness: 97.5,
+    onlineDevices: 27,
+    offlineDevices: 1,
+    countries: 3,
+    districts: 8,
+    aqiGood: 20,
+    aqiModerate: 7,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 96.8,
   },
   {
     region: "Southern Africa",
     uptime: 97.8,
-    mtbf: 110,
-    mttr: 54,
-    failureRate: 9.3,
     deviceCount: 31,
+    pm25: 26.8,
+    pm10: 42.5,
+    dataCompleteness: 94.2,
+    onlineDevices: 28,
+    offlineDevices: 3,
+    countries: 4,
+    districts: 10,
+    aqiGood: 19,
+    aqiModerate: 10,
+    aqiUhfsg: 2,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 91.5,
   },
   {
     region: "Central Africa",
     uptime: 95.3,
-    mtbf: 85,
-    mttr: 68,
-    failureRate: 14.2,
     deviceCount: 24,
+    pm25: 30.2,
+    pm10: 48.6,
+    dataCompleteness: 90.8,
+    onlineDevices: 20,
+    offlineDevices: 4,
+    countries: 3,
+    districts: 7,
+    aqiGood: 12,
+    aqiModerate: 9,
+    aqiUhfsg: 2,
+    aqiUnhealthy: 1,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 87.2,
   },
 ]
 
-// Sample data for maintenance effectiveness
-const maintenanceEffectivenessData = [
-  { month: "Jan", preFailureRate: 12.5, postFailureRate: 8.2 },
-  { month: "Feb", preFailureRate: 13.1, postFailureRate: 7.8 },
-  { month: "Mar", preFailureRate: 11.8, postFailureRate: 6.5 },
-  { month: "Apr", preFailureRate: 12.2, postFailureRate: 5.9 },
-  { month: "May", preFailureRate: 14.5, postFailureRate: 7.2 },
-  { month: "Jun", preFailureRate: 13.8, postFailureRate: 6.8 },
+// Sample country data
+const countryData = [
+  {
+    name: "Uganda",
+    region: "East Africa",
+    devices: 28,
+    onlineDevices: 25,
+    offlineDevices: 3,
+    dataCompleteness: 96.2,
+    pm25: 27.8,
+    pm10: 44.5,
+    districts: 12,
+    uptime: 98.3,
+    aqiGood: 16,
+    aqiModerate: 9,
+    aqiUhfsg: 2,
+    aqiUnhealthy: 1,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 94.5,
+    devicesList: [
+      {
+        id: "UG001",
+        name: "Kampala Central",
+        status: "online",
+        lastUpdate: "10 min ago",
+        pm25: 24.5,
+        pm10: 42.3,
+        batteryLevel: 85,
+        signalStrength: 90,
+      },
+      {
+        id: "UG002",
+        name: "Entebbe Road",
+        status: "online",
+        lastUpdate: "5 min ago",
+        pm25: 22.1,
+        pm10: 38.7,
+        batteryLevel: 72,
+        signalStrength: 85,
+      },
+      {
+        id: "UG003",
+        name: "Jinja Road",
+        status: "offline",
+        lastUpdate: "2 hrs ago",
+        pm25: 31.2,
+        pm10: 49.8,
+        batteryLevel: 23,
+        signalStrength: 20,
+      },
+      {
+        id: "UG004",
+        name: "Gulu Central",
+        status: "online",
+        lastUpdate: "15 min ago",
+        pm25: 18.9,
+        pm10: 32.4,
+        batteryLevel: 90,
+        signalStrength: 95,
+      },
+      {
+        id: "UG005",
+        name: "Mbarara Town",
+        status: "online",
+        lastUpdate: "8 min ago",
+        pm25: 20.5,
+        pm10: 36.2,
+        batteryLevel: 65,
+        signalStrength: 75,
+      },
+    ],
+  },
+  {
+    name: "Kenya",
+    region: "East Africa",
+    devices: 22,
+    onlineDevices: 20,
+    offlineDevices: 2,
+    dataCompleteness: 95.1,
+    pm25: 29.2,
+    pm10: 46.8,
+    districts: 8,
+    uptime: 97.8,
+    aqiGood: 12,
+    aqiModerate: 8,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 1,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 93.2,
+    devicesList: [
+      {
+        id: "KE001",
+        name: "Nairobi CBD",
+        status: "online",
+        lastUpdate: "7 min ago",
+        pm25: 28.7,
+        pm10: 45.9,
+        batteryLevel: 88,
+        signalStrength: 92,
+      },
+      {
+        id: "KE002",
+        name: "Mombasa Road",
+        status: "online",
+        lastUpdate: "12 min ago",
+        pm25: 26.3,
+        pm10: 43.1,
+        batteryLevel: 75,
+        signalStrength: 87,
+      },
+      {
+        id: "KE003",
+        name: "Kisumu Central",
+        status: "offline",
+        lastUpdate: "1 hr ago",
+        pm25: 30.5,
+        pm10: 48.2,
+        batteryLevel: 20,
+        signalStrength: 25,
+      },
+      {
+        id: "KE004",
+        name: "Nakuru Town",
+        status: "online",
+        lastUpdate: "20 min ago",
+        pm25: 24.8,
+        pm10: 40.3,
+        batteryLevel: 68,
+        signalStrength: 78,
+      },
+    ],
+  },
+  {
+    name: "Tanzania",
+    region: "East Africa",
+    devices: 18,
+    onlineDevices: 16,
+    offlineDevices: 2,
+    dataCompleteness: 94.5,
+    pm25: 26.5,
+    pm10: 43.2,
+    districts: 6,
+    uptime: 96.9,
+    aqiGood: 10,
+    aqiModerate: 7,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 91.8,
+    devicesList: [
+      {
+        id: "TZ001",
+        name: "Dar es Salaam",
+        status: "online",
+        lastUpdate: "15 min ago",
+        pm25: 25.8,
+        pm10: 42.7,
+        batteryLevel: 92,
+        signalStrength: 95,
+      },
+      {
+        id: "TZ002",
+        name: "Arusha",
+        status: "online",
+        lastUpdate: "22 min ago",
+        pm25: 22.4,
+        pm10: 37.9,
+        batteryLevel: 78,
+        signalStrength: 89,
+      },
+      {
+        id: "TZ003",
+        name: "Dodoma",
+        status: "offline",
+        lastUpdate: "1.5 hrs ago",
+        pm25: 28.9,
+        pm10: 46.3,
+        batteryLevel: 10,
+        signalStrength: 15,
+      },
+    ],
+  },
+  {
+    name: "Rwanda",
+    region: "East Africa",
+    devices: 15,
+    onlineDevices: 14,
+    offlineDevices: 1,
+    dataCompleteness: 97.8,
+    pm25: 24.1,
+    pm10: 39.5,
+    districts: 5,
+    uptime: 99.1,
+    aqiGood: 11,
+    aqiModerate: 4,
+    aqiUhfsg: 0,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 96.5,
+    devicesList: [
+      {
+        id: "RW001",
+        name: "Kigali Central",
+        status: "online",
+        lastUpdate: "5 min ago",
+        pm25: 23.1,
+        pm10: 38.4,
+        batteryLevel: 95,
+        signalStrength: 98,
+      },
+      {
+        id: "RW002",
+        name: "Musanze",
+        status: "online",
+        lastUpdate: "18 min ago",
+        pm25: 21.7,
+        pm10: 36.2,
+        batteryLevel: 82,
+        signalStrength: 90,
+      },
+      {
+        id: "RW003",
+        name: "Huye",
+        status: "online",
+        lastUpdate: "25 min ago",
+        pm25: 22.9,
+        pm10: 37.8,
+        batteryLevel: 78,
+        signalStrength: 85,
+      },
+    ],
+  },
+  {
+    name: "Nigeria",
+    region: "West Africa",
+    devices: 20,
+    onlineDevices: 17,
+    offlineDevices: 3,
+    dataCompleteness: 93.2,
+    pm25: 32.5,
+    pm10: 53.8,
+    districts: 7,
+    uptime: 95.4,
+    aqiGood: 8,
+    aqiModerate: 9,
+    aqiUhfsg: 2,
+    aqiUnhealthy: 1,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 89.5,
+    devicesList: [
+      {
+        id: "NG001",
+        name: "Lagos Island",
+        status: "online",
+        lastUpdate: "12 min ago",
+        pm25: 31.8,
+        pm10: 52.4,
+        batteryLevel: 70,
+        signalStrength: 80,
+      },
+      {
+        id: "NG002",
+        name: "Abuja Central",
+        status: "online",
+        lastUpdate: "20 min ago",
+        pm25: 29.5,
+        pm10: 48.7,
+        batteryLevel: 65,
+        signalStrength: 75,
+      },
+      {
+        id: "NG003",
+        name: "Port Harcourt",
+        status: "offline",
+        lastUpdate: "2 hrs ago",
+        pm25: 34.2,
+        pm10: 56.1,
+        batteryLevel: 15,
+        signalStrength: 20,
+      },
+    ],
+  },
+  {
+    name: "Ghana",
+    region: "West Africa",
+    devices: 15,
+    onlineDevices: 13,
+    offlineDevices: 2,
+    dataCompleteness: 91.5,
+    pm25: 31.8,
+    pm10: 51.2,
+    districts: 5,
+    uptime: 94.8,
+    aqiGood: 6,
+    aqiModerate: 7,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 1,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 88.3,
+    devicesList: [
+      {
+        id: "GH001",
+        name: "Accra Central",
+        status: "online",
+        lastUpdate: "15 min ago",
+        pm25: 30.5,
+        pm10: 49.8,
+        batteryLevel: 68,
+        signalStrength: 78,
+      },
+      {
+        id: "GH002",
+        name: "Kumasi",
+        status: "online",
+        lastUpdate: "25 min ago",
+        pm25: 28.7,
+        pm10: 47.2,
+        batteryLevel: 72,
+        signalStrength: 82,
+      },
+      {
+        id: "GH003",
+        name: "Tamale",
+        status: "offline",
+        lastUpdate: "1.5 hrs ago",
+        pm25: 32.4,
+        pm10: 53.1,
+        batteryLevel: 18,
+        signalStrength: 25,
+      },
+    ],
+  },
+  {
+    name: "Egypt",
+    region: "North Africa",
+    devices: 18,
+    onlineDevices: 17,
+    offlineDevices: 1,
+    dataCompleteness: 98.1,
+    pm25: 23.5,
+    pm10: 37.8,
+    districts: 6,
+    uptime: 99.3,
+    aqiGood: 12,
+    aqiModerate: 5,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 97.2,
+    devicesList: [
+      {
+        id: "EG001",
+        name: "Cairo Downtown",
+        status: "online",
+        lastUpdate: "8 min ago",
+        pm25: 22.8,
+        pm10: 36.9,
+        batteryLevel: 90,
+        signalStrength: 95,
+      },
+      {
+        id: "EG002",
+        name: "Alexandria",
+        status: "online",
+        lastUpdate: "17 min ago",
+        pm25: 21.5,
+        pm10: 35.2,
+        batteryLevel: 85,
+        signalStrength: 90,
+      },
+      {
+        id: "EG003",
+        name: "Giza",
+        status: "online",
+        lastUpdate: "22 min ago",
+        pm25: 23.7,
+        pm10: 38.4,
+        batteryLevel: 82,
+        signalStrength: 88,
+      },
+    ],
+  },
+  {
+    name: "South Africa",
+    region: "Southern Africa",
+    devices: 24,
+    onlineDevices: 22,
+    offlineDevices: 2,
+    dataCompleteness: 95.8,
+    pm25: 25.2,
+    pm10: 41.5,
+    districts: 8,
+    uptime: 98.1,
+    aqiGood: 14,
+    aqiModerate: 8,
+    aqiUhfsg: 2,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 94.3,
+    devicesList: [
+      {
+        id: "ZA001",
+        name: "Johannesburg CBD",
+        status: "online",
+        lastUpdate: "10 min ago",
+        pm25: 24.7,
+        pm10: 40.8,
+        batteryLevel: 88,
+        signalStrength: 92,
+      },
+      {
+        id: "ZA002",
+        name: "Cape Town",
+        status: "online",
+        lastUpdate: "15 min ago",
+        pm25: 22.9,
+        pm10: 38.5,
+        batteryLevel: 85,
+        signalStrength: 90,
+      },
+      {
+        id: "ZA003",
+        name: "Durban",
+        status: "online",
+        lastUpdate: "20 min ago",
+        pm25: 25.6,
+        pm10: 42.3,
+        batteryLevel: 80,
+        signalStrength: 85,
+      },
+      {
+        id: "ZA004",
+        name: "Pretoria",
+        status: "offline",
+        lastUpdate: "1 hr ago",
+        pm25: 27.8,
+        pm10: 45.2,
+        batteryLevel: 25,
+        signalStrength: 30,
+      },
+    ],
+  },
 ]
 
-// Sample data for battery performance
-const batteryPerformanceData = [
-  { age: 1, performance: 98 },
-  { age: 2, performance: 96 },
-  { age: 3, performance: 94 },
-  { age: 4, performance: 91 },
-  { age: 5, performance: 87 },
-  { age: 6, performance: 82 },
-  { age: 7, performance: 76 },
-  { age: 8, performance: 70 },
-  { age: 9, performance: 63 },
-  { age: 10, performance: 55 },
-  { age: 11, performance: 46 },
-  { age: 12, performance: 38 },
+// Sample district data
+const districtData = [
+  {
+    name: "Kampala",
+    country: "Uganda",
+    region: "East Africa",
+    devices: 12,
+    onlineDevices: 11,
+    offlineDevices: 1,
+    dataCompleteness: 97.2,
+    pm25: 29.5,
+    pm10: 47.8,
+    uptime: 98.7,
+    aqiGood: 7,
+    aqiModerate: 4,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 95.8,
+    devicesList: [
+      {
+        id: "KLA001",
+        name: "Nakasero",
+        status: "online",
+        lastUpdate: "5 min ago",
+        pm25: 28.7,
+        pm10: 46.9,
+        batteryLevel: 90,
+        signalStrength: 95,
+      },
+      {
+        id: "KLA002",
+        name: "Kololo",
+        status: "online",
+        lastUpdate: "12 min ago",
+        pm25: 27.5,
+        pm10: 45.2,
+        batteryLevel: 85,
+        signalStrength: 90,
+      },
+      {
+        id: "KLA003",
+        name: "Bugolobi",
+        status: "online",
+        lastUpdate: "18 min ago",
+        pm25: 29.1,
+        pm10: 47.5,
+        batteryLevel: 80,
+        signalStrength: 85,
+      },
+      {
+        id: "KLA004",
+        name: "Makindye",
+        status: "offline",
+        lastUpdate: "1.5 hrs ago",
+        pm25: 31.2,
+        pm10: 50.3,
+        batteryLevel: 20,
+        signalStrength: 25,
+      },
+    ],
+  },
+  {
+    name: "Wakiso",
+    country: "Uganda",
+    region: "East Africa",
+    devices: 8,
+    onlineDevices: 7,
+    offlineDevices: 1,
+    dataCompleteness: 95.8,
+    pm25: 27.2,
+    pm10: 43.5,
+    uptime: 97.9,
+    aqiGood: 5,
+    aqiModerate: 2,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 93.5,
+    devicesList: [
+      {
+        id: "WAK001",
+        name: "Nansana",
+        status: "online",
+        lastUpdate: "10 min ago",
+        pm25: 26.8,
+        pm10: 42.9,
+        batteryLevel: 85,
+        signalStrength: 90,
+      },
+      {
+        id: "WAK002",
+        name: "Entebbe",
+        status: "online",
+        lastUpdate: "15 min ago",
+        pm25: 25.9,
+        pm10: 41.7,
+        batteryLevel: 80,
+        signalStrength: 85,
+      },
+      {
+        id: "WAK003",
+        name: "Kira",
+        status: "offline",
+        lastUpdate: "2 hrs ago",
+        pm25: 28.4,
+        pm10: 45.8,
+        batteryLevel: 15,
+        signalStrength: 20,
+      },
+    ],
+  },
+  {
+    name: "Nairobi",
+    country: "Kenya",
+    region: "East Africa",
+    devices: 10,
+    onlineDevices: 9,
+    offlineDevices: 1,
+    dataCompleteness: 96.5,
+    pm25: 30.1,
+    pm10: 48.2,
+    uptime: 98.2,
+    aqiGood: 6,
+    aqiModerate: 3,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 94.7,
+    devicesList: [
+      {
+        id: "NBO001",
+        name: "Westlands",
+        status: "online",
+        lastUpdate: "8 min ago",
+        pm25: 29.5,
+        pm10: 47.3,
+        batteryLevel: 88,
+        signalStrength: 92,
+      },
+      {
+        id: "NBO002",
+        name: "Kibera",
+        status: "online",
+        lastUpdate: "14 min ago",
+        pm25: 31.2,
+        pm10: 49.8,
+        batteryLevel: 82,
+        signalStrength: 88,
+      },
+      {
+        id: "NBO003",
+        name: "Karen",
+        status: "online",
+        lastUpdate: "20 min ago",
+        pm25: 28.7,
+        pm10: 46.2,
+        batteryLevel: 78,
+        signalStrength: 85,
+      },
+      {
+        id: "NBO004",
+        name: "Eastleigh",
+        status: "offline",
+        lastUpdate: "1 hr ago",
+        pm25: 32.5,
+        pm10: 51.4,
+        batteryLevel: 22,
+        signalStrength: 25,
+      },
+    ],
+  },
+  {
+    name: "Mombasa",
+    country: "Kenya",
+    region: "East Africa",
+    devices: 6,
+    onlineDevices: 5,
+    offlineDevices: 1,
+    dataCompleteness: 94.2,
+    pm25: 28.5,
+    pm10: 45.8,
+    uptime: 97.1,
+    aqiGood: 3,
+    aqiModerate: 2,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 92.8,
+    devicesList: [
+      {
+        id: "MSA001",
+        name: "Nyali",
+        status: "online",
+        lastUpdate: "12 min ago",
+        pm25: 27.9,
+        pm10: 44.8,
+        batteryLevel: 85,
+        signalStrength: 90,
+      },
+      {
+        id: "MSA002",
+        name: "Likoni",
+        status: "online",
+        lastUpdate: "18 min ago",
+        pm25: 28.7,
+        pm10: 46.2,
+        batteryLevel: 80,
+        signalStrength: 85,
+      },
+      {
+        id: "MSA003",
+        name: "Bamburi",
+        status: "offline",
+        lastUpdate: "1.5 hrs ago",
+        pm25: 29.5,
+        pm10: 47.3,
+        batteryLevel: 18,
+        signalStrength: 22,
+      },
+    ],
+  },
+  {
+    name: "Dar es Salaam",
+    country: "Tanzania",
+    region: "East Africa",
+    devices: 9,
+    onlineDevices: 8,
+    offlineDevices: 1,
+    dataCompleteness: 95.1,
+    pm25: 27.8,
+    pm10: 44.2,
+    uptime: 96.8,
+    aqiGood: 5,
+    aqiModerate: 3,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 93.2,
+    devicesList: [
+      {
+        id: "DSM001",
+        name: "Mikocheni",
+        status: "online",
+        lastUpdate: "10 min ago",
+        pm25: 26.9,
+        pm10: 43.5,
+        batteryLevel: 88,
+        signalStrength: 92,
+      },
+      {
+        id: "DSM002",
+        name: "Kinondoni",
+        status: "online",
+        lastUpdate: "15 min ago",
+        pm25: 27.5,
+        pm10: 44.1,
+        batteryLevel: 85,
+        signalStrength: 90,
+      },
+      {
+        id: "DSM003",
+        name: "Ilala",
+        status: "online",
+        lastUpdate: "22 min ago",
+        pm25: 28.2,
+        pm10: 45.3,
+        batteryLevel: 80,
+        signalStrength: 85,
+      },
+      {
+        id: "DSM004",
+        name: "Temeke",
+        status: "offline",
+        lastUpdate: "1 hr ago",
+        pm25: 29.8,
+        pm10: 47.2,
+        batteryLevel: 20,
+        signalStrength: 25,
+      },
+    ],
+  },
+  {
+    name: "Kigali",
+    country: "Rwanda",
+    region: "East Africa",
+    devices: 8,
+    onlineDevices: 8,
+    offlineDevices: 0,
+    dataCompleteness: 98.5,
+    pm25: 23.8,
+    pm10: 38.5,
+    uptime: 99.4,
+    aqiGood: 6,
+    aqiModerate: 2,
+    aqiUhfsg: 0,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 97.8,
+    devicesList: [
+      {
+        id: "KGL001",
+        name: "Nyamirambo",
+        status: "online",
+        lastUpdate: "5 min ago",
+        pm25: 22.9,
+        pm10: 37.5,
+        batteryLevel: 95,
+        signalStrength: 98,
+      },
+      {
+        id: "KGL002",
+        name: "Kimihurura",
+        status: "online",
+        lastUpdate: "12 min ago",
+        pm25: 23.5,
+        pm10: 38.2,
+        batteryLevel: 90,
+        signalStrength: 95,
+      },
+      {
+        id: "KGL003",
+        name: "Kacyiru",
+        status: "online",
+        lastUpdate: "18 min ago",
+        pm25: 24.1,
+        pm10: 39.3,
+        batteryLevel: 88,
+        signalStrength: 92,
+      },
+    ],
+  },
+  {
+    name: "Lagos",
+    country: "Nigeria",
+    region: "West Africa",
+    devices: 12,
+    onlineDevices: 10,
+    offlineDevices: 2,
+    dataCompleteness: 92.8,
+    pm25: 33.5,
+    pm10: 55.2,
+    uptime: 95.2,
+    aqiGood: 4,
+    aqiModerate: 6,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 1,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 90.5,
+    devicesList: [
+      {
+        id: "LOS001",
+        name: "Ikeja",
+        status: "online",
+        lastUpdate: "8 min ago",
+        pm25: 32.8,
+        pm10: 54.2,
+        batteryLevel: 85,
+        signalStrength: 90,
+      },
+      {
+        id: "LOS002",
+        name: "Victoria Island",
+        status: "online",
+        lastUpdate: "15 min ago",
+        pm25: 31.5,
+        pm10: 52.7,
+        batteryLevel: 80,
+        signalStrength: 85,
+      },
+      {
+        id: "LOS003",
+        name: "Lekki",
+        status: "offline",
+        lastUpdate: "1.5 hrs ago",
+        pm25: 34.2,
+        pm10: 56.8,
+        batteryLevel: 18,
+        signalStrength: 22,
+      },
+      {
+        id: "LOS004",
+        name: "Surulere",
+        status: "offline",
+        lastUpdate: "2 hrs ago",
+        pm25: 35.1,
+        pm10: 57.9,
+        batteryLevel: 15,
+        signalStrength: 20,
+      },
+    ],
+  },
+  {
+    name: "Accra",
+    country: "Ghana",
+    region: "West Africa",
+    devices: 8,
+    onlineDevices: 7,
+    offlineDevices: 1,
+    dataCompleteness: 93.2,
+    pm25: 31.2,
+    pm10: 50.5,
+    uptime: 94.9,
+    aqiGood: 3,
+    aqiModerate: 4,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 91.7,
+    devicesList: [
+      {
+        id: "ACC001",
+        name: "Osu",
+        status: "online",
+        lastUpdate: "10 min ago",
+        pm25: 30.5,
+        pm10: 49.8,
+        batteryLevel: 82,
+        signalStrength: 88,
+      },
+      {
+        id: "ACC002",
+        name: "Cantonments",
+        status: "online",
+        lastUpdate: "18 min ago",
+        pm25: 29.8,
+        pm10: 48.5,
+        batteryLevel: 78,
+        signalStrength: 85,
+      },
+      {
+        id: "ACC003",
+        name: "Airport Residential",
+        status: "offline",
+        lastUpdate: "1 hr ago",
+        pm25: 32.4,
+        pm10: 52.1,
+        batteryLevel: 20,
+        signalStrength: 25,
+      },
+    ],
+  },
+  {
+    name: "Cairo",
+    country: "Egypt",
+    region: "North Africa",
+    devices: 10,
+    onlineDevices: 10,
+    offlineDevices: 0,
+    dataCompleteness: 98.8,
+    pm25: 22.8,
+    pm10: 36.5,
+    uptime: 99.5,
+    aqiGood: 7,
+    aqiModerate: 3,
+    aqiUhfsg: 0,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 97.9,
+    devicesList: [
+      {
+        id: "CAI001",
+        name: "Zamalek",
+        status: "online",
+        lastUpdate: "5 min ago",
+        pm25: 21.9,
+        pm10: 35.4,
+        batteryLevel: 95,
+        signalStrength: 98,
+      },
+      {
+        id: "CAI002",
+        name: "Maadi",
+        status: "online",
+        lastUpdate: "12 min ago",
+        pm25: 22.5,
+        pm10: 36.2,
+        batteryLevel: 90,
+        signalStrength: 95,
+      },
+      {
+        id: "CAI003",
+        name: "Heliopolis",
+        status: "online",
+        lastUpdate: "18 min ago",
+        pm25: 23.2,
+        pm10: 37.1,
+        batteryLevel: 88,
+        signalStrength: 92,
+      },
+    ],
+  },
+  {
+    name: "Johannesburg",
+    country: "South Africa",
+    region: "Southern Africa",
+    devices: 14,
+    onlineDevices: 13,
+    offlineDevices: 1,
+    dataCompleteness: 96.2,
+    pm25: 24.5,
+    pm10: 40.2,
+    uptime: 98.3,
+    aqiGood: 8,
+    aqiModerate: 5,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 95.1,
+    devicesList: [
+      {
+        id: "JHB001",
+        name: "Sandton",
+        status: "online",
+        lastUpdate: "7 min ago",
+        pm25: 23.8,
+        pm10: 39.5,
+        batteryLevel: 90,
+        signalStrength: 95,
+      },
+      {
+        id: "JHB002",
+        name: "Soweto",
+        status: "online",
+        lastUpdate: "15 min ago",
+        pm25: 24.9,
+        pm10: 40.8,
+        batteryLevel: 85,
+        signalStrength: 90,
+      },
+      {
+        id: "JHB003",
+        name: "Rosebank",
+        status: "online",
+        lastUpdate: "20 min ago",
+        pm25: 24.2,
+        pm10: 39.7,
+        batteryLevel: 82,
+        signalStrength: 88,
+      },
+      {
+        id: "JHB004",
+        name: "Braamfontein",
+        status: "offline",
+        lastUpdate: "1.5 hrs ago",
+        pm25: 25.8,
+        pm10: 42.3,
+        batteryLevel: 18,
+        signalStrength: 22,
+      },
+    ],
+  },
 ]
 
-// Sample data for device reliability metrics
-const deviceReliabilityData = [
-  { category: "Uptime", value: 98.2 },
-  { category: "Data Completeness", value: 96.5 },
-  { category: "Battery Health", value: 87.3 },
-  { category: "Signal Strength", value: 91.8 },
-  { category: "Sensor Accuracy", value: 94.2 },
-]
-
-// Sample data for calibration drift over time
-const calibrationDriftData = [
-  { month: "Jan", pm25Drift: 0.5, pm10Drift: 0.8, tempDrift: 0.2, humidityDrift: 0.3 },
-  { month: "Feb", pm25Drift: 0.8, pm10Drift: 1.2, tempDrift: 0.3, humidityDrift: 0.5 },
-  { month: "Mar", pm25Drift: 1.2, pm10Drift: 1.8, tempDrift: 0.4, humidityDrift: 0.7 },
-  { month: "Apr", pm25Drift: 1.6, pm10Drift: 2.3, tempDrift: 0.5, humidityDrift: 0.9 },
-  { month: "May", pm25Drift: 2.1, pm10Drift: 2.8, tempDrift: 0.6, humidityDrift: 1.2 },
-  { month: "Jun", pm25Drift: 2.8, pm10Drift: 3.5, tempDrift: 0.7, humidityDrift: 1.5 },
-]
-
-// Sample data for environmental impact on device performance
-const environmentalImpactData = [
-  { name: "Humidity", performance: 85, reliability: 80 },
-  { name: "Temperature", performance: 90, reliability: 88 },
-  { name: "Dust", performance: 70, reliability: 65 },
-  { name: "Rainfall", performance: 75, reliability: 72 },
-  { name: "UV Exposure", performance: 82, reliability: 78 },
-]
-
-// Sample data for data transmission tracking
-const dataTransmissionByDeviceData = [
-  { date: "2024-06-01", KLA001: 100, KLA002: 100, NBI001: 100, LAG001: 100, CAI001: 100 },
-  { date: "2024-06-02", KLA001: 100, KLA002: 100, NBI001: 100, LAG001: 100, CAI001: 100 },
-  { date: "2024-06-03", KLA001: 0, KLA002: 100, NBI001: 100, LAG001: 100, CAI001: 100 },
-  { date: "2024-06-04", KLA001: 100, KLA002: 100, NBI001: 0, LAG001: 100, CAI001: 100 },
-  { date: "2024-06-05", KLA001: 100, KLA002: 0, NBI001: 100, LAG001: 100, CAI001: 100 },
-  { date: "2024-06-06", KLA001: 100, KLA002: 100, NBI001: 100, LAG001: 0, CAI001: 100 },
-  { date: "2024-06-07", KLA001: 100, KLA002: 100, NBI001: 100, LAG001: 100, CAI001: 0 },
-  { date: "2024-06-08", KLA001: 100, KLA002: 100, NBI001: 100, LAG001: 100, CAI001: 100 },
-  { date: "2024-06-09", KLA001: 100, KLA002: 0, NBI001: 0, LAG001: 100, CAI001: 100 },
-  { date: "2024-06-10", KLA001: 100, KLA002: 100, NBI001: 100, LAG001: 100, CAI001: 100 },
-]
-
-// Sample data for data volume over time
-const dataVolumeOverTimeData = [
-  { date: "2024-06-01", dataVolume: 1250, expectedVolume: 1250, devices: 5 },
-  { date: "2024-06-02", dataVolume: 1250, expectedVolume: 1250, devices: 5 },
-  { date: "2024-06-03", dataVolume: 1000, expectedVolume: 1250, devices: 4 },
-  { date: "2024-06-04", dataVolume: 1000, expectedVolume: 1250, devices: 4 },
-  { date: "2024-06-05", dataVolume: 1000, expectedVolume: 1250, devices: 4 },
-  { date: "2024-06-06", dataVolume: 1000, expectedVolume: 1250, devices: 4 },
-  { date: "2024-06-07", dataVolume: 1000, expectedVolume: 1250, devices: 4 },
-  { date: "2024-06-08", dataVolume: 1250, expectedVolume: 1250, devices: 5 },
-  { date: "2024-06-09", dataVolume: 750, expectedVolume: 1250, devices: 3 },
-  { date: "2024-06-10", dataVolume: 1250, expectedVolume: 1250, devices: 5 },
-]
-
-// Sample data for hourly data transmission patterns
-const hourlyDataTransmissionData = [
-  { hour: "00:00", dataVolume: 45, devices: 5 },
-  { hour: "01:00", dataVolume: 42, devices: 5 },
-  { hour: "02:00", dataVolume: 40, devices: 5 },
-  { hour: "03:00", dataVolume: 38, devices: 5 },
-  { hour: "04:00", dataVolume: 35, devices: 5 },
-  { hour: "05:00", dataVolume: 32, devices: 4 },
-  { hour: "06:00", dataVolume: 38, devices: 5 },
-  { hour: "07:00", dataVolume: 48, devices: 5 },
-  { hour: "08:00", dataVolume: 55, devices: 5 },
-  { hour: "09:00", dataVolume: 60, devices: 5 },
-  { hour: "10:00", dataVolume: 62, devices: 5 },
-  { hour: "11:00", dataVolume: 65, devices: 5 },
-  { hour: "12:00", dataVolume: 68, devices: 5 },
-  { hour: "13:00", dataVolume: 70, devices: 5 },
-  { hour: "14:00", dataVolume: 72, devices: 5 },
-  { hour: "15:00", dataVolume: 68, devices: 5 },
-  { hour: "16:00", dataVolume: 65, devices: 5 },
-  { hour: "17:00", dataVolume: 60, devices: 5 },
-  { hour: "18:00", dataVolume: 55, devices: 5 },
-  { hour: "19:00", dataVolume: 50, devices: 5 },
-  { hour: "20:00", dataVolume: 48, devices: 5 },
-  { hour: "21:00", dataVolume: 45, devices: 5 },
-  { hour: "22:00", dataVolume: 42, devices: 5 },
-  { hour: "23:00", dataVolume: 40, devices: 5 },
+// Sample village data
+const villageData = [
+  {
+    name: "Nakasero",
+    district: "Kampala",
+    country: "Uganda",
+    region: "East Africa",
+    devices: 5,
+    onlineDevices: 5,
+    offlineDevices: 0,
+    dataCompleteness: 98.5,
+    pm25: 30.2,
+    pm10: 49.1,
+    uptime: 99.2,
+    aqiGood: 3,
+    aqiModerate: 2,
+    aqiUhfsg: 0,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 97.8,
+    devicesList: [
+      {
+        id: "NAK001",
+        name: "Parliament Avenue",
+        status: "online",
+        lastUpdate: "5 min ago",
+        pm25: 29.8,
+        pm10: 48.5,
+        batteryLevel: 92,
+        signalStrength: 95,
+      },
+      {
+        id: "NAK002",
+        name: "Kampala Road",
+        status: "online",
+        lastUpdate: "12 min ago",
+        pm25: 30.5,
+        pm10: 49.7,
+        batteryLevel: 88,
+        signalStrength: 92,
+      },
+    ],
+  },
+  {
+    name: "Kololo",
+    district: "Kampala",
+    country: "Uganda",
+    region: "East Africa",
+    devices: 4,
+    onlineDevices: 3,
+    offlineDevices: 1,
+    dataCompleteness: 96.8,
+    pm25: 28.9,
+    pm10: 46.5,
+    uptime: 97.5,
+    aqiGood: 2,
+    aqiModerate: 1,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 95.2,
+    devicesList: [
+      {
+        id: "KOL001",
+        name: "Upper Kololo",
+        status: "online",
+        lastUpdate: "8 min ago",
+        pm25: 28.2,
+        pm10: 45.9,
+        batteryLevel: 85,
+        signalStrength: 90,
+      },
+      {
+        id: "KOL002",
+        name: "Kololo Airstrip",
+        status: "offline",
+        lastUpdate: "1.5 hrs ago",
+        pm25: 29.5,
+        pm10: 47.8,
+        batteryLevel: 20,
+        signalStrength: 25,
+      },
+    ],
+  },
+  {
+    name: "Bugolobi",
+    district: "Kampala",
+    country: "Uganda",
+    region: "East Africa",
+    devices: 3,
+    onlineDevices: 3,
+    offlineDevices: 0,
+    dataCompleteness: 97.1,
+    pm25: 29.4,
+    pm10: 47.8,
+    uptime: 98.9,
+    aqiGood: 2,
+    aqiModerate: 1,
+    aqiUhfsg: 0,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 96.5,
+    devicesList: [
+      {
+        id: "BUG001",
+        name: "Bugolobi Flats",
+        status: "online",
+        lastUpdate: "10 min ago",
+        pm25: 29.1,
+        pm10: 47.3,
+        batteryLevel: 88,
+        signalStrength: 92,
+      },
+      {
+        id: "BUG002",
+        name: "Luthuli Avenue",
+        status: "online",
+        lastUpdate: "15 min ago",
+        pm25: 29.7,
+        pm10: 48.2,
+        batteryLevel: 85,
+        signalStrength: 90,
+      },
+    ],
+  },
+  {
+    name: "Nansana",
+    district: "Wakiso",
+    country: "Uganda",
+    region: "East Africa",
+    devices: 4,
+    onlineDevices: 3,
+    offlineDevices: 1,
+    dataCompleteness: 94.8,
+    pm25: 27.5,
+    pm10: 44.2,
+    uptime: 97.2,
+    aqiGood: 2,
+    aqiModerate: 1,
+    aqiUhfsg: 1,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 93.5,
+    devicesList: [
+      {
+        id: "NAN001",
+        name: "Nansana East",
+        status: "online",
+        lastUpdate: "12 min ago",
+        pm25: 27.1,
+        pm10: 43.8,
+        batteryLevel: 82,
+        signalStrength: 88,
+      },
+      {
+        id: "NAN002",
+        name: "Nansana West",
+        status: "offline",
+        lastUpdate: "2 hrs ago",
+        pm25: 28.4,
+        pm10: 45.9,
+        batteryLevel: 18,
+        signalStrength: 22,
+      },
+    ],
+  },
+  {
+    name: "Entebbe",
+    district: "Wakiso",
+    country: "Uganda",
+    region: "East Africa",
+    devices: 4,
+    onlineDevices: 4,
+    offlineDevices: 0,
+    dataCompleteness: 96.7,
+    pm25: 26.8,
+    pm10: 42.9,
+    uptime: 98.6,
+    aqiGood: 3,
+    aqiModerate: 1,
+    aqiUhfsg: 0,
+    aqiUnhealthy: 0,
+    aqiVeryUnhealthy: 0,
+    aqiHazardous: 0,
+    dataTransmissionRate: 95.8,
+    devicesList: [
+      {
+        id: "ENT001",
+        name: "Entebbe Airport",
+        status: "online",
+        lastUpdate: "7 min ago",
+        pm25: 26.5,
+        pm10: 42.3,
+        batteryLevel: 90,
+        signalStrength: 95,
+      },
+      {
+        id: "ENT002",
+        name: "Entebbe Town",
+        status: "online",
+        lastUpdate: "15 min ago",
+        pm25: 27.1,
+        pm10: 43.5,
+        batteryLevel: 85,
+        signalStrength: 90,
+      },
+    ],
+  },
 ]
 
 // Sample site data for site-specific analysis
@@ -277,11 +1411,65 @@ const sitePerformanceData = {
   ],
 }
 
+// Regional summary data
+const regionalSummaryData = {
+  regions: 5,
+  totalDevices: 160,
+  countries: 12,
+  countriesDevices: 160,
+  districts: 48,
+  districtsWithDevices: 42,
+  onlineDevices: 143,
+  offlineDevices: 17,
+  dataCompleteness: 94.2,
+  averagePM25: 28.4,
+  averagePM10: 45.6,
+}
+
+// Function to format number with units
+function formatNumber(value, decimals = 1) {
+  // Check if value is null, undefined, or not a number
+  if (value === null || value === undefined || isNaN(Number(value))) {
+    return "N/A"
+  }
+  return Number(value).toFixed(decimals) + " μg/m³"
+}
+
+// AQI color mapping
+const aqiColors = {
+  good: "#4CAF50",
+  moderate: "#FFC107",
+  unhealthySensitive: "#FF9800",
+  unhealthy: "#F44336",
+  veryUnhealthy: "#9C27B0",
+  hazardous: "#B71C1C",
+}
+
+// PM2.5 time series data for comparison charts
+const pm25TimeSeriesData = [
+  { date: "4/18/2025", pm25: 9, pm10: 3 },
+  { date: "4/19/2025", pm25: 26, pm10: 36 },
+  { date: "4/20/2025", pm25: 17, pm10: 22 },
+  { date: "4/21/2025", pm25: 19, pm10: 25 },
+  { date: "4/22/2025", pm25: 22, pm10: 31 },
+  { date: "4/23/2025", pm25: 17, pm10: 16 },
+  { date: "4/24/2025", pm25: 18, pm10: 21 },
+  { date: "4/25/2025", pm25: 16, pm10: 18 },
+]
+
 export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState("month")
   const [activeTab, setActiveTab] = useState("network")
   const [selectedSite, setSelectedSite] = useState("kampala")
-  const [analysisView, setAnalysisView] = useState("general")
+  const [selectedRegion, setSelectedRegion] = useState("East Africa")
+  const [selectedRegionForCountry, setSelectedRegionForCountry] = useState("East Africa")
+  const [selectedCountry, setSelectedCountry] = useState("Uganda")
+  const [selectedRegionForDistrict, setSelectedRegionForDistrict] = useState("East Africa")
+  const [selectedCountryForDistrict, setSelectedCountryForDistrict] = useState("Uganda")
+  const [selectedDistrict, setSelectedDistrict] = useState("Kampala")
+  const [selectedLocation, setSelectedLocation] = useState("Nakasero")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
 
   // Get the current site data
   const currentSite = sitesList.find((site) => site.id === selectedSite) || sitesList[0]
@@ -289,6 +1477,138 @@ export default function AnalyticsPage() {
     siteAirQualityData[selectedSite as keyof typeof siteAirQualityData] || siteAirQualityData.kampala
   const currentSitePerformance =
     sitePerformanceData[selectedSite as keyof typeof sitePerformanceData] || sitePerformanceData.kampala
+
+  // Get the selected region data
+  const currentRegion =
+    regionalComparisonData.find((region) => region.region === selectedRegion) || regionalComparisonData[0]
+
+  // Get the selected country data
+  const currentCountry = countryData.find((country) => country.name === selectedCountry) || countryData[0]
+
+  // Get the selected district data
+  const currentDistrict = districtData.find((district) => district.name === selectedDistrict) || districtData[0]
+
+  // Filter countries based on selected region
+  const countriesInSelectedRegion = countryData.filter((country) => country.region === selectedRegionForCountry)
+
+  // Filter districts based on selected country
+  const districtsInSelectedCountry = districtData.filter((district) => district.country === selectedCountryForDistrict)
+
+  // Filter locations based on selected district
+  const locationsInSelectedDistrict = villageData.filter((village) => village.district === selectedDistrict)
+
+  // Get the selected location data
+  const currentLocation = villageData.find((village) => village.name === selectedLocation) || villageData[0]
+
+  // Filter countries for the regional analysis view
+  const countriesInRegion = countryData.filter((country) => country.region === selectedRegion)
+
+  // Filter districts for the country analysis view
+  const districtsInCountry = districtData.filter((district) => district.country === selectedCountry)
+
+  // Find regions with highest and lowest offline devices
+  const regionWithMostOfflineDevices = useMemo(() => {
+    return regionalComparisonData.reduce((prev, current) => 
+      (prev.offlineDevices > current.offlineDevices) ? prev : current
+    );
+  }, []);
+
+  const regionWithLeastOfflineDevices = useMemo(() => {
+    return regionalComparisonData.reduce((prev, current) => 
+      (prev.offlineDevices < current.offlineDevices) ? prev : current
+    );
+  }, []);
+
+  // Find countries with highest and lowest offline devices
+  const countryWithMostOfflineDevices = useMemo(() => {
+    return countryData.reduce((prev, current) => 
+      (prev.offlineDevices > current.offlineDevices) ? prev : current
+    );
+  }, []);
+
+  const countryWithLeastOfflineDevices = useMemo(() => {
+    return countryData.reduce((prev, current) => 
+      (prev.offlineDevices < current.offlineDevices && current.offlineDevices > 0) ? prev : current
+    );
+  }, []);
+
+  // Find districts with highest and lowest offline devices
+  const districtWithMostOfflineDevices = useMemo(() => {
+    return districtData.reduce((prev, current) => 
+      (prev.offlineDevices > current.offlineDevices) ? prev : current
+    );
+  }, []);
+
+  const districtWithLeastOfflineDevices = useMemo(() => {
+    return districtData.reduce((prev, current) => 
+      (prev.offlineDevices < current.offlineDevices && current.offlineDevices > 0) ? prev : current
+    );
+  }, []);
+
+  // Find locations with highest and lowest offline devices
+  const locationWithMostOfflineDevices = useMemo(() => {
+    return villageData.reduce((prev, current) => 
+      (prev.offlineDevices > current.offlineDevices) ? prev : current
+    );
+  }, []);
+
+  const locationWithLeastOfflineDevices = useMemo(() => {
+    return villageData.reduce((prev, current) => 
+      (prev.offlineDevices < current.offlineDevices && current.offlineDevices > 0) ? prev : current
+    );
+  }, []);
+
+  // Find entities with best and worst data transmission rates
+  const regionWithBestDataTransmission = useMemo(() => {
+    return regionalComparisonData.reduce((prev, current) => 
+      (prev.dataTransmissionRate > current.dataTransmissionRate) ? prev : current
+    );
+  }, []);
+
+  const regionWithWorstDataTransmission = useMemo(() => {
+    return regionalComparisonData.reduce((prev, current) => 
+      (prev.dataTransmissionRate < current.dataTransmissionRate) ? prev : current
+    );
+  }, []);
+
+  // Prepare AQI distribution data for pie chart
+  const getAqiDistributionData = (entity) => {
+    if (!entity) return [];
+    
+    return [
+      { name: "Good", value: entity.aqiGood || 0, color: aqiColors.good },
+      { name: "Moderate", value: entity.aqiModerate || 0, color: aqiColors.moderate },
+      { name: "UHFSG", value: entity.aqiUhfsg || 0, color: aqiColors.unhealthySensitive },
+      { name: "Unhealthy", value: entity.aqiUnhealthy || 0, color: aqiColors.unhealthy },
+      { name: "V.Unhealthy", value: entity.aqiVeryUnhealthy || 0, color: aqiColors.veryUnhealthy },
+      { name: "Hazardous", value: entity.aqiHazardous || 0, color: aqiColors.hazardous },
+    ];
+  };
+
+  // Get AQI distribution data for current selections
+  const regionAqiData = getAqiDistributionData(currentRegion);
+  const countryAqiData = getAqiDistributionData(currentCountry);
+  const districtAqiData = getAqiDistributionData(currentDistrict);
+  const locationAqiData = getAqiDistributionData(currentLocation);
+
+  // Filter devices based on search term and status filter
+  const filterDevices = (devices) => {
+    if (!devices) return [];
+    
+    return devices.filter((device) => {
+      const matchesSearch = 
+        device.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        device.name.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === "all" || device.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+  };
+
+  const filteredCountryDevices = filterDevices(currentCountry.devicesList);
+  const filteredDistrictDevices = filterDevices(currentDistrict.devicesList);
+  const filteredLocationDevices = filterDevices(currentLocation.devicesList);
 
   return (
     <div className="space-y-6">
@@ -317,411 +1637,233 @@ export default function AnalyticsPage() {
         </TabsList>
 
         <TabsContent value="network" className="space-y-6">
+          {/* Regional Analysis Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center">
+                  <Globe className="mr-2 h-5 w-5 text-primary" />
+                  Regions & Devices
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{regionalSummaryData.regions} Regions</div>
+                <p className="text-sm text-muted-foreground">
+                  {regionalSummaryData.totalDevices} devices across all regions
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center">
+                  <Map className="mr-2 h-5 w-5 text-primary" />
+                  Countries
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{regionalSummaryData.countries} Countries</div>
+                <p className="text-sm text-muted-foreground">
+                  {regionalSummaryData.countriesDevices} devices across all countries
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center">
+                  <Layers className="mr-2 h-5 w-5 text-primary" />
+                  Districts
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {regionalSummaryData.districtsWithDevices}/{regionalSummaryData.districts}
+                </div>
+                <p className="text-sm text-muted-foreground">Districts with active monitoring devices</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center">
                   <Activity className="mr-2 h-5 w-5 text-primary" />
-                  Average Uptime
+                  Device Status
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">98.2%</div>
-                <p className="text-xs text-muted-foreground">+0.7% from previous period</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <Timer className="mr-2 h-5 w-5 text-primary" />
-                  Average MTBF
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">118 days</div>
-                <p className="text-xs text-muted-foreground">+8 days from previous period</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <Wrench className="mr-2 h-5 w-5 text-primary" />
-                  Average MTTR
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">52 hours</div>
-                <p className="text-xs text-muted-foreground">-4 hours from previous period</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <AlertTriangle className="mr-2 h-5 w-5 text-primary" />
-                  Failure Rate
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">9.8%</div>
-                <p className="text-xs text-muted-foreground">-1.2% from previous period</p>
+                <div className="text-2xl font-bold">
+                  {regionalSummaryData.onlineDevices}/{regionalSummaryData.totalDevices}
+                </div>
+                <p className="text-sm text-muted-foreground">Devices currently online</p>
               </CardContent>
             </Card>
           </div>
 
-          <Tabs defaultValue="data-transmission" className="w-full">
-            <TabsList className="grid grid-cols-5 mb-4">
-              <TabsTrigger value="data-transmission">Data Transmission</TabsTrigger>
-              <TabsTrigger value="performance">Performance</TabsTrigger>
-              <TabsTrigger value="reliability">Reliability</TabsTrigger>
+          <Tabs defaultValue="regional" className="w-full">
+            <TabsList className="grid grid-cols-3 mb-4">
               <TabsTrigger value="regional">Regional Analysis</TabsTrigger>
-              <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+              <TabsTrigger value="country">Country Analysis</TabsTrigger>
+              <TabsTrigger value="district">District Analysis</TabsTrigger>
             </TabsList>
 
-           
-             
-                <TabsContent value="data-transmission" className="space-y-4">
-                {/* Replace the static content with the dynamic component */}
-                <DataTransmissionAnalysis timeRange={timeRange} />
-              </TabsContent>
-
-            <TabsContent value="performance" className="space-y-4">
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Activity className="mr-2 h-5 w-5 text-primary" />
-                    Device Performance Metrics
-                  </CardTitle>
-                  <CardDescription>Key performance indicators over time</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={devicePerformanceData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Line type="monotone" dataKey="uptime" stroke="#4CAF50" name="Uptime (%)" />
-                        <Line
-                          type="monotone"
-                          dataKey="dataCompleteness"
-                          stroke="#2196F3"
-                          name="Data Completeness (%)"
-                        />
-                        <Line type="monotone" dataKey="batteryHealth" stroke="#FF9800" name="Battery Health (%)" />
-                        <Line type="monotone" dataKey="signalStrength" stroke="#9C27B0" name="Signal Strength (%)" />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-                <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <TrendingUp className="mr-2 h-4 w-4 text-green-500" />
-                    Overall device performance has improved by 2.3% compared to previous period
-                  </div>
-                </CardFooter>
-              </Card>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Battery className="mr-2 h-5 w-5 text-primary" />
-                      Battery Performance Over Time
-                    </CardTitle>
-                    <CardDescription>Battery performance degradation with age (months)</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={batteryPerformanceData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="age" />
-                          <YAxis />
-                          <Tooltip />
-                          <Area
-                            type="monotone"
-                            dataKey="performance"
-                            stroke="#FF9800"
-                            fill="#FFE0B2"
-                            name="Battery Performance"
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <AlertTriangle className="mr-2 h-4 w-4 text-yellow-500" />
-                      Battery performance drops below 70% after 8 months of deployment
-                    </div>
-                  </CardFooter>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Zap className="mr-2 h-5 w-5 text-primary" />
-                      Calibration Drift Analysis
-                    </CardTitle>
-                    <CardDescription>Sensor drift percentage over time</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={calibrationDriftData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="month" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Line type="monotone" dataKey="pm25Drift" stroke="#8884d8" name="PM2.5 Drift (%)" />
-                          <Line type="monotone" dataKey="pm10Drift" stroke="#82ca9d" name="PM10 Drift (%)" />
-                          <Line type="monotone" dataKey="tempDrift" stroke="#ffc658" name="Temp Drift (°C)" />
-                          <Line type="monotone" dataKey="humidityDrift" stroke="#ff8042" name="Humidity Drift (%)" />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <TrendingUp className="mr-2 h-4 w-4 text-red-500" />
-                      PM10 sensors show the highest drift rate, requiring more frequent calibration
-                    </div>
-                  </CardFooter>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <MapPin className="mr-2 h-5 w-5 text-primary" />
-                    Environmental Impact on Device Performance
-                  </CardTitle>
-                  <CardDescription>How environmental factors affect device performance and reliability</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart outerRadius={150} data={environmentalImpactData}>
-                        <PolarGrid />
-                        <PolarAngleAxis dataKey="name" />
-                        <PolarRadiusAxis angle={30} domain={[0, 100]} />
-                        <Radar
-                          name="Performance"
-                          dataKey="performance"
-                          stroke="#8884d8"
-                          fill="#8884d8"
-                          fillOpacity={0.6}
-                        />
-                        <Radar
-                          name="Reliability"
-                          dataKey="reliability"
-                          stroke="#82ca9d"
-                          fill="#82ca9d"
-                          fillOpacity={0.6}
-                        />
-                        <Legend />
-                        <Tooltip />
-                      </RadarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-                <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <AlertTriangle className="mr-2 h-4 w-4 text-yellow-500" />
-                    Dust exposure has the most significant negative impact on device performance and reliability
-                  </div>
-                </CardFooter>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="reliability" className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <PieChartIcon className="mr-2 h-5 w-5 text-primary" />
-                      Failure Type Distribution
-                    </CardTitle>
-                    <CardDescription>Breakdown of device failures by cause</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={failureTypeData}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={120}
-                            fill="#8884d8"
-                            dataKey="value"
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          >
-                            {failureTypeData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={failureColors[index % failureColors.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <AlertTriangle className="mr-2 h-4 w-4 text-yellow-500" />
-                      Power issues are the leading cause of device failures (35%)
-                    </div>
-                  </CardFooter>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <BarChartIcon className="mr-2 h-5 w-5 text-primary" />
-                      Device Reliability Metrics
-                    </CardTitle>
-                    <CardDescription>Key reliability indicators</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={deviceReliabilityData} layout="vertical">
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis type="number" domain={[0, 100]} />
-                          <YAxis dataKey="category" type="category" width={150} />
-                          <Tooltip />
-                          <Bar
-                            dataKey="value"
-                            fill="#8884d8"
-                            name="Reliability Score (%)"
-                            label={{ position: "right", formatter: (value) => `${value}%` }}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <TrendingUp className="mr-2 h-4 w-4 text-green-500" />
-                      Uptime and sensor accuracy show the highest reliability scores
-                    </div>
-                  </CardFooter>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Clock className="mr-2 h-5 w-5 text-primary" />
-                    Time Between Failures Analysis
-                  </CardTitle>
-                  <CardDescription>Distribution of time between device failures</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ScatterChart>
-                        <CartesianGrid />
-                        <XAxis type="number" dataKey="x" name="Days Between Failures" domain={[0, 200]} />
-                        <YAxis type="number" dataKey="y" name="Frequency" />
-                        <Tooltip cursor={{ strokeDasharray: "3 3" }} />
-                        <Scatter
-                          name="MTBF Distribution"
-                          data={[
-                            { x: 20, y: 5 },
-                            { x: 40, y: 8 },
-                            { x: 60, y: 15 },
-                            { x: 80, y: 25 },
-                            { x: 100, y: 35 },
-                            { x: 120, y: 42 },
-                            { x: 140, y: 30 },
-                            { x: 160, y: 18 },
-                            { x: 180, y: 10 },
-                            { x: 200, y: 5 },
-                          ]}
-                          fill="#8884d8"
-                        />
-                      </ScatterChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-                <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Activity className="mr-2 h-4 w-4 text-primary" />
-                    Most devices operate for 100-140 days between failures
-                  </div>
-                </CardFooter>
-              </Card>
-            </TabsContent>
-
             <TabsContent value="regional" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <MapPin className="mr-2 h-5 w-5 text-primary" />
-                    Regional Performance Comparison
-                  </CardTitle>
-                  <CardDescription>Device performance metrics by region</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="text-left py-3 px-4 font-medium text-gray-600">Region</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-600">Uptime (%)</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-600">MTBF (days)</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-600">MTTR (hours)</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-600">Failure Rate (%)</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-600">Device Count</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {regionalComparisonData.map((region, index) => (
-                          <tr
-                            key={region.region}
-                            className={`border-b hover:bg-gray-50 transition-colors ${
-                              index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
-                            }`}
-                          >
-                            <td className="py-3 px-4 font-medium">{region.region}</td>
-                            <td className="py-3 px-4">{region.uptime}%</td>
-                            <td className="py-3 px-4">{region.mtbf}</td>
-                            <td className="py-3 px-4">{region.mttr}</td>
-                            <td className="py-3 px-4">{region.failureRate}%</td>
-                            <td className="py-3 px-4">{region.deviceCount}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-                <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <TrendingUp className="mr-2 h-4 w-4 text-green-500" />
-                    North Africa shows the best overall device performance metrics
-                  </div>
-                </CardFooter>
-              </Card>
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex-1">
+                  <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                    <SelectTrigger className="w-[300px]">
+                      <SelectValue placeholder="Select a region" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {regionalComparisonData.map((region) => (
+                        <SelectItem key={region.region} value={region.region}>
+                          {region.region}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" className="flex items-center">
+                    <Download className="mr-2 h-4 w-4" /> Export Data
+                  </Button>
+                </div>
+              </div>
+
+              {/* AQI Distribution Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                {regionAqiData.map((item) => (
+                  <Card key={item.name} className="overflow-hidden">
+                    <CardHeader className={`pb-2 bg-gradient-to-r from-${item.name.toLowerCase()}-500/10 to-transparent`}>
+                      <CardTitle className="text-sm font-medium text-center">{item.name}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4 flex justify-center">
+                      <div 
+                        className="text-3xl font-bold flex items-center justify-center h-16 w-16 rounded-full text-white"
+                        style={{ backgroundColor: item.color }}
+                      >
+                        {item.value}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Region-specific metric cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      <Signal className="mr-2 h-5 w-5 text-green-500" />
+                      Online Devices
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{currentRegion.onlineDevices}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {((currentRegion.onlineDevices / currentRegion.deviceCount) * 100).toFixed(1)}% of total devices
+                    </p>
+                    <div className="mt-2">
+                      <Progress
+                        value={(currentRegion.onlineDevices / currentRegion.deviceCount) * 100}
+                        className="h-2"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      <SignalZero className="mr-2 h-5 w-5 text-red-500" />
+                      Offline Devices
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{currentRegion.offlineDevices}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {((currentRegion.offlineDevices / currentRegion.deviceCount) * 100).toFixed(1)}% of total devices
+                    </p>
+                    <div className="mt-2">
+                      <Progress
+                        value={(currentRegion.offlineDevices / currentRegion.deviceCount) * 100}
+                        className="h-2"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      <Percent className="mr-2 h-5 w-5 text-primary" />
+                      Data Completeness
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{currentRegion.dataCompleteness}%</div>
+                    <p className="text-xs text-muted-foreground">Average across all devices</p>
+                    <div className="mt-2">
+                      <Progress value={currentRegion.dataCompleteness} className="h-2" />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      <Wind className="mr-2 h-5 w-5 text-primary" />
+                      Average PM2.5
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{currentRegion.pm25} μg/m³</div>
+                    <p className="text-xs text-muted-foreground">Regional average</p>
+                    <div className="mt-2">
+                      <Progress value={Math.min(100, (currentRegion.pm25 / 50) * 100)} className="h-2" />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      <Wind className="mr-2 h-5 w-5 text-primary" />
+                      Average PM10
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{currentRegion.pm10} μg/m³</div>
+                    <p className="text-xs text-muted-foreground">Regional average</p>
+                    <div className="mt-2">
+                      <Progress value={Math.min(100, (currentRegion.pm10 / 100) * 100)} className="h-2" />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      <Activity className="mr-2 h-5 w-5 text-primary" />
+                      Data Transmission
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{currentRegion.dataTransmissionRate}%</div>
+                    <p className="text-xs text-muted-foreground">Regional average</p>
+                    <div className="mt-2">
+                      <Progress value={currentRegion.dataTransmissionRate} className="h-2" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
                       <Activity className="mr-2 h-5 w-5 text-primary" />
-                      Regional Uptime Comparison
+                      Device Distribution by Country
                     </CardTitle>
-                    <CardDescription>Device uptime percentage by region</CardDescription>
+                    <CardDescription>Number of devices by country in {selectedRegion}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
-                          data={regionalComparisonData}
+                          data={countriesInRegion}
                           margin={{
                             top: 5,
                             right: 30,
@@ -730,10 +1872,13 @@ export default function AnalyticsPage() {
                           }}
                         >
                           <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="region" />
-                          <YAxis domain={[90, 100]} />
+                          <XAxis dataKey="name" />
+                          <YAxis />
                           <Tooltip />
-                          <Bar dataKey="uptime" name="Uptime (%)" fill="#4CAF50" />
+                          <Legend />
+                          <Bar dataKey="devices" name="Total Devices" fill="#4CAF50" />
+                          <Bar dataKey="onlineDevices" name="Online Devices" fill="#2196F3" />
+                          <Bar dataKey="offlineDevices" name="Offline Devices" fill="#F44336" />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -743,253 +1888,675 @@ export default function AnalyticsPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
-                      <AlertTriangle className="mr-2 h-5 w-5 text-primary" />
-                      Regional Failure Rate Comparison
+                      <Wind className="mr-2 h-5 w-5 text-primary" />
+                      AQI Distribution
                     </CardTitle>
-                    <CardDescription>Device failure rates by region</CardDescription>
+                    <CardDescription>Distribution of AQI categories in {selectedRegion}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={regionalComparisonData}
-                          margin={{
-                            top: 5,
-                            right: 30,
-                            left: 20,
-                            bottom: 5,
-                          }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="region" />
-                          <YAxis />
+                        <PieChart>
+                          <Pie
+                            data={regionAqiData.filter(item => item.value > 0)}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={true}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                            label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {regionAqiData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
                           <Tooltip />
-                          <Bar dataKey="failureRate" name="Failure Rate (%)" fill="#F44336" />
-                        </BarChart>
+                          <Legend />
+                        </PieChart>
                       </ResponsiveContainer>
                     </div>
                   </CardContent>
                 </Card>
               </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Settings className="mr-2 h-5 w-5 text-primary" />
-                    Regional MTBF & MTTR Comparison
-                  </CardTitle>
-                  <CardDescription>Mean Time Between Failures and Mean Time To Repair by region</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={regionalComparisonData}
-                        margin={{
-                          top: 5,
-                          right: 30,
-                          left: 20,
-                          bottom: 5,
-                        }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="region" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="mtbf" name="MTBF (days)" fill="#8884d8" />
-                        <Bar dataKey="mttr" name="MTTR (hours)" fill="#82ca9d" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-                <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <TrendingDown className="mr-2 h-4 w-4 text-green-500" />
-                    North Africa has the highest MTBF and lowest MTTR, indicating superior device reliability
-                  </div>
-                </CardFooter>
-              </Card>
             </TabsContent>
 
-            <TabsContent value="maintenance" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Wrench className="mr-2 h-5 w-5 text-primary" />
-                    Maintenance Effectiveness
-                  </CardTitle>
-                  <CardDescription>Impact of maintenance on device failure rates</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={maintenanceEffectivenessData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Line
-                          type="monotone"
-                          dataKey="preFailureRate"
-                          stroke="#F44336"
-                          name="Pre-Maintenance Failure Rate (%)"
-                          strokeWidth={2}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="postFailureRate"
-                          stroke="#4CAF50"
-                          name="Post-Maintenance Failure Rate (%)"
-                          strokeWidth={2}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
+            <TabsContent value="country" className="space-y-4">
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center space-x-4">
+                  <div>
+                    <Select
+                      value={selectedRegionForCountry}
+                      onValueChange={(value) => {
+                        setSelectedRegionForCountry(value)
+                        // Reset country selection when region changes
+                        const firstCountryInRegion = countryData.find((c) => c.region === value)?.name || "Uganda"
+                        setSelectedCountry(firstCountryInRegion)
+                      }}
+                    >
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Select a region" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {regionalComparisonData.map((region) => (
+                          <SelectItem key={region.region} value={region.region}>
+                            {region.region}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardContent>
-                <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <TrendingDown className="mr-2 h-4 w-4 text-green-500" />
-                    Maintenance activities reduce failure rates by an average of 48%
+                  <div>
+                    <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Select a country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {countriesInSelectedRegion.map((country) => (
+                          <SelectItem key={country.name} value={country.name}>
+                            {country.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardFooter>
-              </Card>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" className="flex items-center">
+                    <Download className="mr-2 h-4 w-4" /> Export Data
+                  </Button>
+                </div>
+              </div>
+
+              {/* AQI Distribution Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                {countryAqiData.map((item) => (
+                  <Card key={item.name} className="overflow-hidden">
+                    <CardHeader className={`pb-2 bg-gradient-to-r from-${item.name.toLowerCase()}-500/10 to-transparent`}>
+                      <CardTitle className="text-sm font-medium text-center">{item.name}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4 flex justify-center">
+                      <div 
+                        className="text-3xl font-bold flex items-center justify-center h-16 w-16 rounded-full text-white"
+                        style={{ backgroundColor: item.color }}
+                      >
+                        {item.value}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Country-specific metric cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      <Signal className="mr-2 h-5 w-5 text-green-500" />
+                      Online Devices
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{currentCountry.onlineDevices}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {((currentCountry.onlineDevices / currentCountry.devices) * 100).toFixed(1)}% of total devices
+                    </p>
+                    <div className="mt-2">
+                      <Progress 
+                        value={(currentCountry.onlineDevices / currentCountry.devices) * 100} 
+                        className="h-2" 
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      <SignalZero className="mr-2 h-5 w-5 text-red-500" />
+                      Offline Devices
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{currentCountry.offlineDevices}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {((currentCountry.offlineDevices / currentCountry.devices) * 100).toFixed(1)}% of total devices
+                    </p>
+                    <div className="mt-2">
+                      <Progress 
+                        value={(currentCountry.offlineDevices / currentCountry.devices) * 100} 
+                        className="h-2" 
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      <Percent className="mr-2 h-5 w-5 text-primary" />
+                      Data Transmission
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{currentCountry.dataTransmissionRate}%</div>
+                    <p className="text-xs text-muted-foreground">Country average</p>
+                    <div className="mt-2">
+                      <Progress value={currentCountry.dataTransmissionRate} className="h-2" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
-                      <Calendar className="mr-2 h-5 w-5 text-primary" />
-                      Maintenance Schedule Adherence
+                      <Activity className="mr-2 h-5 w-5 text-primary" />
+                      Device Distribution by District
                     </CardTitle>
-                    <CardDescription>Percentage of maintenance activities performed on schedule</CardDescription>
+                    <CardDescription>Number of devices by district in {selectedCountry}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={[
-                              { name: "On Schedule", value: 78 },
-                              { name: "Delayed", value: 15 },
-                              { name: "Missed", value: 7 },
-                            ]}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={120}
-                            fill="#8884d8"
-                            dataKey="value"
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          >
-                            <Cell fill="#4CAF50" />
-                            <Cell fill="#FFC107" />
-                            <Cell fill="#F44336" />
-                          </Pie>
+                        <BarChart
+                          data={districtsInCountry}
+                          margin={{
+                            top: 5,
+                            right: 30,
+                            left: 20,
+                            bottom: 5,
+                          }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis />
                           <Tooltip />
-                        </PieChart>
+                          <Legend />
+                          <Bar dataKey="devices" name="Total Devices" fill="#4CAF50" />
+                          <Bar dataKey="onlineDevices" name="Online Devices" fill="#2196F3" />
+                          <Bar dataKey="offlineDevices" name="Offline Devices" fill="#F44336" />
+                        </BarChart>
                       </ResponsiveContainer>
                     </div>
                   </CardContent>
-                  <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <TrendingUp className="mr-2 h-4 w-4 text-green-500" />
-                      Maintenance schedule adherence has improved by 8% compared to previous period
-                    </div>
-                  </CardFooter>
                 </Card>
 
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
-                      <Settings className="mr-2 h-5 w-5 text-primary" />
-                      Maintenance Type Distribution
+                      <Wind className="mr-2 h-5 w-5 text-primary" />
+                      PM10 vs PM2.5 Comparison
                     </CardTitle>
-                    <CardDescription>Breakdown of maintenance activities by type</CardDescription>
+                    <CardDescription>Comparison of PM10 and PM2.5 levels over time</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={[
-                              { name: "Preventive", value: 45 },
-                              { name: "Corrective", value: 30 },
-                              { name: "Calibration", value: 20 },
-                              { name: "Upgrade", value: 5 },
-                            ]}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={120}
-                            fill="#8884d8"
-                            dataKey="value"
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          >
-                            <Cell fill="#4CAF50" />
-                            <Cell fill="#F44336" />
-                            <Cell fill="#2196F3" />
-                            <Cell fill="#9C27B0" />
-                          </Pie>
+                        <LineChart data={pm25TimeSeriesData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis />
                           <Tooltip />
-                        </PieChart>
+                          <Legend />
+                          <Line type="monotone" dataKey="pm25" name="PM2.5 (μg/m³)" stroke="#8884d8" />
+                          <Line type="monotone" dataKey="pm10" name="PM10 (μg/m³)" stroke="#82ca9d" />
+                        </LineChart>
                       </ResponsiveContainer>
                     </div>
                   </CardContent>
-                  <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <TrendingUp className="mr-2 h-4 w-4 text-green-500" />
-                      Preventive maintenance has increased by 15% compared to previous period
-                    </div>
-                  </CardFooter>
                 </Card>
               </div>
 
+              {/* Device List for Country */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
-                    <Timer className="mr-2 h-5 w-5 text-primary" />
-                    Maintenance Time Analysis
+                    <Activity className="mr-2 h-5 w-5 text-primary" />
+                    Device List for {selectedCountry}
                   </CardTitle>
-                  <CardDescription>Average time spent on different maintenance activities</CardDescription>
+                  <CardDescription>All devices in {selectedCountry} and their current status</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={[
-                          { type: "Battery Replacement", time: 45 },
-                          { type: "Sensor Calibration", time: 120 },
-                          { type: "Housing Repair", time: 90 },
-                          { type: "Firmware Update", time: 30 },
-                          { type: "Connectivity Fix", time: 60 },
-                          { type: "Cleaning", time: 20 },
-                        ]}
-                        margin={{
-                          top: 5,
-                          right: 30,
-                          left: 20,
-                          bottom: 5,
-                        }}
-                        layout="vertical"
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" />
-                        <YAxis dataKey="type" type="category" width={150} />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="time" name="Average Time (minutes)" fill="#8884d8" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                    <div className="relative w-full sm:w-64">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search devices..."
+                        className="pl-8"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Devices</SelectItem>
+                        <SelectItem value="online">Online</SelectItem>
+                        <SelectItem value="offline">Offline</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Device ID</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Last Update</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">PM2.5</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">PM10</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Battery</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Signal</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredCountryDevices.length > 0 ? (
+                          filteredCountryDevices.map((device) => (
+                            <tr key={device.id} className="border-t hover:bg-muted/30">
+                              <td className="py-3 px-4 font-mono text-sm">{device.id}</td>
+                              <td className="py-3 px-4">{device.name}</td>
+                              <td className="py-3 px-4">
+                                <Badge className={device.status === "online" ? "bg-green-500" : "bg-red-500"}>
+                                  {device.status}
+                                </Badge>
+                              </td>
+                              <td className="py-3 px-4">{device.lastUpdate}</td>
+                              <td className="py-3 px-4">{device.pm25} μg/m³</td>
+                              <td className="py-3 px-4">{device.pm10} μg/m³</td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full ${
+                                        device.batteryLevel > 70
+                                          ? "bg-green-500"
+                                          : device.batteryLevel > 30
+                                            ? "bg-yellow-500"
+                                            : "bg-red-500"
+                                      }`}
+                                      style={{ width: `${device.batteryLevel}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs">{device.batteryLevel}%</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-1">
+                                  {Array.from({ length: 4 }).map((_, i) => (
+                                    <div
+                                      key={i}
+                                      className={`w-1 rounded-full ${
+                                        i < Math.ceil(device.signalStrength / 25) ? "bg-primary" : "bg-muted"
+                                      }`}
+                                      style={{ height: `${6 + i * 2}px` }}
+                                    />
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={8} className="py-4 text-center text-muted-foreground">
+                              No devices found matching your criteria
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </CardContent>
-                <CardFooter className="bg-gray-50 border-t px-4 py-3">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Clock className="mr-2 h-4 w-4 text-primary" />
-                    Sensor calibration is the most time-consuming maintenance activity
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="district" className="space-y-4">
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div>
+                    <Select
+                      value={selectedRegionForDistrict}
+                      onValueChange={(value) => {
+                        setSelectedRegionForDistrict(value)
+                        // Reset country selection when region changes
+                        const firstCountryInRegion = countryData.find((c) => c.region === value)?.name || "Uganda"
+                        setSelectedCountryForDistrict(firstCountryInRegion)
+                        // Reset district selection
+                        const firstDistrictInCountry = districtData.find((d) => d.country === firstCountryInRegion)?.name || "Kampala"
+                        setSelectedDistrict(firstDistrictInCountry)
+                      }}
+                    >
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Select a region" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {regionalComparisonData.map((region) => (
+                          <SelectItem key={region.region} value={region.region}>
+                            {region.region}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardFooter>
+                  <div>
+                    <Select 
+                      value={selectedCountryForDistrict} 
+                      onValueChange={(value) => {
+                        setSelectedCountryForDistrict(value)
+                        // Reset district selection when country changes
+                        const firstDistrictInCountry = districtData.find((d) => d.country === value)?.name || "Kampala"
+                        setSelectedDistrict(firstDistrictInCountry)
+                      }}
+                    >
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Select a country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {countriesInSelectedRegion.map((country) => (
+                          <SelectItem key={country.name} value={country.name}>
+                            {country.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Select a district" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {districtsInSelectedCountry.map((district) => (
+                          <SelectItem key={district.name} value={district.name}>
+                            {district.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" className="flex items-center">
+                    <Download className="mr-2 h-4 w-4" /> Export Data
+                  </Button>
+                </div>
+              </div>
+
+              {/* AQI Distribution Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                {districtAqiData.map((item) => (
+                  <Card key={item.name} className="overflow-hidden">
+                    <CardHeader className={`pb-2 bg-gradient-to-r from-${item.name.toLowerCase()}-500/10 to-transparent`}>
+                      <CardTitle className="text-sm font-medium text-center">{item.name}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4 flex justify-center">
+                      <div 
+                        className="text-3xl font-bold flex items-center justify-center h-16 w-16 rounded-full text-white"
+                        style={{ backgroundColor: item.color }}
+                      >
+                        {item.value}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* District-specific metric cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      <Signal className="mr-2 h-5 w-5 text-green-500" />
+                      Online Devices
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{currentDistrict.onlineDevices}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {((currentDistrict.onlineDevices / currentDistrict.devices) * 100).toFixed(1)}% of total devices
+                    </p>
+                    <div className="mt-2">
+                      <Progress 
+                        value={(currentDistrict.onlineDevices / currentDistrict.devices) * 100} 
+                        className="h-2" 
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      <SignalZero className="mr-2 h-5 w-5 text-red-500" />
+                      Offline Devices
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{currentDistrict.offlineDevices}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {((currentDistrict.offlineDevices / currentDistrict.devices) * 100).toFixed(1)}% of total devices
+                    </p>
+                    <div className="mt-2">
+                      <Progress 
+                        value={(currentDistrict.offlineDevices / currentDistrict.devices) * 100} 
+                        className="h-2" 
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      <Percent className="mr-2 h-5 w-5 text-primary" />
+                      Data Transmission
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{currentDistrict.dataTransmissionRate}%</div>
+                    <p className="text-xs text-muted-foreground">District average</p>
+                    <div className="mt-2">
+                      <Progress value={currentDistrict.dataTransmissionRate} className="h-2" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Activity className="mr-2 h-5 w-5 text-primary" />
+                      Location Analysis
+                    </CardTitle>
+                    <CardDescription>Performance metrics by location in {selectedDistrict}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-sm font-medium mb-2">Select Location</h3>
+                        <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select a location" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {locationsInSelectedDistrict.map((location) => (
+                              <SelectItem key={location.name} value={location.name}>
+                                {location.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <h3 className="text-sm font-medium mb-2">Location Metrics</h3>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Total Devices:</span>
+                              <span className="font-medium">{currentLocation.devices}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Online Devices:</span>
+                              <span className="font-medium text-green-600">{currentLocation.onlineDevices}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Offline Devices:</span>
+                              <span className="font-medium text-red-600">{currentLocation.offlineDevices}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Data Transmission:</span>
+                              <span className="font-medium">{currentLocation.dataTransmissionRate}%</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-medium mb-2">Air Quality Metrics</h3>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">PM2.5 Average:</span>
+                              <span className="font-medium">{currentLocation.pm25} μg/m³</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">PM10 Average:</span>
+                              <span className="font-medium">{currentLocation.dataCompleteness}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Wind className="mr-2 h-5 w-5 text-primary" />
+                      Air Quality Trends
+                    </CardTitle>
+                    <CardDescription>Air quality trends over time in {selectedDistrict}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={pm25TimeSeriesData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Line type="monotone" dataKey="pm25" name="PM2.5 (μg/m³)" stroke="#8884d8" />
+                          <Line type="monotone" dataKey="pm10" name="PM10 (μg/m³)" stroke="#82ca9d" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Device List for District */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Activity className="mr-2 h-5 w-5 text-primary" />
+                    Device List for {selectedDistrict}
+                  </CardTitle>
+                  <CardDescription>All devices in {selectedDistrict} and their current status</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                    <div className="relative w-full sm:w-64">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search devices..."
+                        className="pl-8"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Devices</SelectItem>
+                        <SelectItem value="online">Online</SelectItem>
+                        <SelectItem value="offline">Offline</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Device ID</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Last Update</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">PM2.5</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">PM10</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Battery</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Signal</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredDistrictDevices.length > 0 ? (
+                          filteredDistrictDevices.map((device) => (
+                            <tr key={device.id} className="border-t hover:bg-muted/30">
+                              <td className="py-3 px-4 font-mono text-sm">{device.id}</td>
+                              <td className="py-3 px-4">{device.name}</td>
+                              <td className="py-3 px-4">
+                                <Badge className={device.status === "online" ? "bg-green-500" : "bg-red-500"}>
+                                  {device.status}
+                                </Badge>
+                              </td>
+                              <td className="py-3 px-4">{device.lastUpdate}</td>
+                              <td className="py-3 px-4">{device.pm25} μg/m³</td>
+                              <td className="py-3 px-4">{device.pm10} μg/m³</td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full ${
+                                        device.batteryLevel > 70
+                                          ? "bg-green-500"
+                                          : device.batteryLevel > 30
+                                            ? "bg-yellow-500"
+                                            : "bg-red-500"
+                                      }`}
+                                      style={{ width: `${device.batteryLevel}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs">{device.batteryLevel}%</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-1">
+                                  {Array.from({ length: 4 }).map((_, i) => (
+                                    <div
+                                      key={i}
+                                      className={`w-1 rounded-full ${
+                                        i < Math.ceil(device.signalStrength / 25) ? "bg-primary" : "bg-muted"
+                                      }`}
+                                      style={{ height: `${6 + i * 2}px` }}
+                                    />
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={8} className="py-4 text-center text-muted-foreground">
+                              No devices found matching your criteria
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
@@ -997,9 +2564,10 @@ export default function AnalyticsPage() {
 
         <TabsContent value="site" className="space-y-6">
           
-            <SiteAnalyticsPage/>
-        </TabsContent>
+          <SiteAnalyticsPage/>
+      </TabsContent>
       </Tabs>
     </div>
   )
 }
+
