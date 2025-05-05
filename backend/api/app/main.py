@@ -292,7 +292,7 @@ def get_device(device_id: str, db=Depends(get_db)):
             device_dict['site'] = site
         
         return create_json_response(device_dict)
-    except HTTPException:
+    # except HTTPException:
         raise
     except Exception as e:
         print(f"Error in get_device: {str(e)}")
@@ -1768,3 +1768,107 @@ def get_all_devices_detail(db=Depends(get_db)):
     except Exception as e:
         print(f"Error in get_all_devices_detail: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch all device details: {str(e)}")
+
+
+@app.get("/device-monitoring-metrics")
+def get_device_monitoring_metrics(db=Depends(get_db)):
+    try:
+        # Query to get region and country summary metrics
+        region_country_query = text("""
+            WITH region_counts AS (
+                SELECT 
+                    admin_level_country as country_name,
+                    COUNT(DISTINCT l.device_key) as device_count,
+                    COUNT(DISTINCT admin_level_division) as district_count,
+                    SUM(CASE WHEN d.is_active = true THEN 1 ELSE 0 END) as active_devices,
+                    -- Group countries into regions
+                    CASE
+                        WHEN admin_level_country IN ('Uganda', 'Kenya', 'Tanzania', 'Rwanda', 'Burundi', 'South Sudan') THEN 'East Africa'
+                        WHEN admin_level_country IN ('Nigeria', 'Ghana', 'Senegal', 'Ivory Coast', 'Cameroon') THEN 'West Africa'
+                        WHEN admin_level_country IN ('South Africa', 'Botswana', 'Zimbabwe', 'Zambia', 'Mozambique') THEN 'Southern Africa'
+                        WHEN admin_level_country IN ('Egypt', 'Morocco', 'Tunisia', 'Algeria', 'Libya') THEN 'North Africa'
+                        WHEN admin_level_country IN ('DR Congo', 'Chad', 'Central African Republic', 'Gabon') THEN 'Central Africa'
+                        ELSE 'Other'
+                    END as region
+                FROM dim_location l
+                JOIN dim_device d ON l.device_key = d.device_key
+                WHERE l.is_active = true AND admin_level_country IS NOT NULL
+                GROUP BY admin_level_country
+            ),
+            region_summary AS (
+                SELECT 
+                    region,
+                    COUNT(DISTINCT country_name) as country_count,
+                    SUM(device_count) as total_devices,
+                    SUM(district_count) as total_districts
+                FROM region_counts
+                GROUP BY region
+            )
+            SELECT 
+                COUNT(DISTINCT region) as total_regions,
+                SUM(total_devices) as total_devices,
+                SUM(country_count) as total_countries,
+                SUM(total_districts) as total_districts
+            FROM region_summary
+        """)
+        
+        region_country_result = db.execute(region_country_query).fetchone()
+        
+        # Query to get device status metrics
+        device_status_query = text("""
+            WITH latest_device_status AS (
+                SELECT DISTINCT ON (s.device_key)
+                    s.device_key,
+                    s.is_online,
+                    s.device_status
+                FROM fact_device_status s
+                JOIN dim_device d ON s.device_key = d.device_key
+                WHERE d.is_active = true
+                ORDER BY s.device_key, s.timestamp DESC
+            )
+            SELECT
+                COUNT(*) as total_active_devices,
+                SUM(CASE WHEN is_online = true THEN 1 ELSE 0 END) as online_devices,
+                SUM(CASE WHEN is_online = false THEN 1 ELSE 0 END) as offline_devices
+            FROM latest_device_status
+        """)
+        
+        device_status_result = db.execute(device_status_query).fetchone()
+        
+        # Query to get district metrics
+        district_query = text("""
+            SELECT
+                COUNT(DISTINCT CASE WHEN admin_level_division IS NOT NULL THEN admin_level_division END) as total_districts,
+                COUNT(DISTINCT CASE WHEN d.is_active = true AND admin_level_division IS NOT NULL THEN admin_level_division END) as districts_with_devices
+            FROM dim_location l
+            JOIN dim_device d ON l.device_key = d.device_key
+        """)
+        
+        district_result = db.execute(district_query).fetchone()
+        
+        # Format the response
+        response = {
+            "regions": {
+                "count": region_country_result.total_regions if region_country_result else 0,
+                "devices": region_country_result.total_devices if region_country_result else 0
+            },
+            "countries": {
+                "count": region_country_result.total_countries if region_country_result else 0,
+                "devices": region_country_result.total_devices if region_country_result else 0
+            },
+            "districts": {
+                "total": district_result.total_districts if district_result else 0,
+                "with_devices": district_result.districts_with_devices if district_result else 0
+            },
+            "devices": {
+                "total": device_status_result.total_active_devices if device_status_result else 0,
+                "online": device_status_result.online_devices if device_status_result else 0,
+                "offline": device_status_result.offline_devices if device_status_result else 0
+            }
+        }
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error in get_device_monitoring_metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch device monitoring metrics: {str(e)}")

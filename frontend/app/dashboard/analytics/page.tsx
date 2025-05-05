@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Progress } from "@/components/ui/progress"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -41,1392 +41,17 @@ import RegionalAnalysis from "./RegionalAnalysisPage"
 import CountryAnalysisPage from "./CountryAnalysisPage"
 import DistrictAnalysisPage from "./DistrictAnalysisPage"
 
-// Sample data for regional comparison
-const regionalComparisonData = [
-  {
-    region: "East Africa",
-    uptime: 98.5,
-    deviceCount: 42,
-    pm25: 28.5,
-    pm10: 45.2,
-    dataCompleteness: 95.8,
-    onlineDevices: 38,
-    offlineDevices: 4,
-    countries: 5,
-    districts: 18,
-    aqiGood: 24,
-    aqiModerate: 14,
-    aqiUhfsg: 3,
-    aqiUnhealthy: 1,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 92.5,
-  },
-  {
-    region: "West Africa",
-    uptime: 96.2,
-    deviceCount: 35,
-    pm25: 32.1,
-    pm10: 52.7,
-    dataCompleteness: 92.3,
-    onlineDevices: 30,
-    offlineDevices: 5,
-    countries: 4,
-    districts: 12,
-    aqiGood: 18,
-    aqiModerate: 12,
-    aqiUhfsg: 4,
-    aqiUnhealthy: 1,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 88.7,
-  },
-  {
-    region: "North Africa",
-    uptime: 99.1,
-    deviceCount: 28,
-    pm25: 24.3,
-    pm10: 38.9,
-    dataCompleteness: 97.5,
-    onlineDevices: 27,
-    offlineDevices: 1,
-    countries: 3,
-    districts: 8,
-    aqiGood: 20,
-    aqiModerate: 7,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 96.8,
-  },
-  {
-    region: "Southern Africa",
-    uptime: 97.8,
-    deviceCount: 31,
-    pm25: 26.8,
-    pm10: 42.5,
-    dataCompleteness: 94.2,
-    onlineDevices: 28,
-    offlineDevices: 3,
-    countries: 4,
-    districts: 10,
-    aqiGood: 19,
-    aqiModerate: 10,
-    aqiUhfsg: 2,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 91.5,
-  },
-  {
-    region: "Central Africa",
-    uptime: 95.3,
-    deviceCount: 24,
-    pm25: 30.2,
-    pm10: 48.6,
-    dataCompleteness: 90.8,
-    onlineDevices: 20,
-    offlineDevices: 4,
-    countries: 3,
-    districts: 7,
-    aqiGood: 12,
-    aqiModerate: 9,
-    aqiUhfsg: 2,
-    aqiUnhealthy: 1,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 87.2,
-  },
-]
+// API endpoint base URL
+const API_BASE_URL = "http://srv792913.hstgr.cloud:8000";
 
-// Sample country data
-const countryData = [
-  {
-    name: "Uganda",
-    region: "East Africa",
-    devices: 28,
-    onlineDevices: 25,
-    offlineDevices: 3,
-    dataCompleteness: 96.2,
-    pm25: 27.8,
-    pm10: 44.5,
-    districts: 12,
-    uptime: 98.3,
-    aqiGood: 16,
-    aqiModerate: 9,
-    aqiUhfsg: 2,
-    aqiUnhealthy: 1,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 94.5,
-    devicesList: [
-      {
-        id: "UG001",
-        name: "Kampala Central",
-        status: "online",
-        lastUpdate: "10 min ago",
-        pm25: 24.5,
-        pm10: 42.3,
-        batteryLevel: 85,
-        signalStrength: 90,
-      },
-      {
-        id: "UG002",
-        name: "Entebbe Road",
-        status: "online",
-        lastUpdate: "5 min ago",
-        pm25: 22.1,
-        pm10: 38.7,
-        batteryLevel: 72,
-        signalStrength: 85,
-      },
-      {
-        id: "UG003",
-        name: "Jinja Road",
-        status: "offline",
-        lastUpdate: "2 hrs ago",
-        pm25: 31.2,
-        pm10: 49.8,
-        batteryLevel: 23,
-        signalStrength: 20,
-      },
-      {
-        id: "UG004",
-        name: "Gulu Central",
-        status: "online",
-        lastUpdate: "15 min ago",
-        pm25: 18.9,
-        pm10: 32.4,
-        batteryLevel: 90,
-        signalStrength: 95,
-      },
-      {
-        id: "UG005",
-        name: "Mbarara Town",
-        status: "online",
-        lastUpdate: "8 min ago",
-        pm25: 20.5,
-        pm10: 36.2,
-        batteryLevel: 65,
-        signalStrength: 75,
-      },
-    ],
-  },
-  {
-    name: "Kenya",
-    region: "East Africa",
-    devices: 22,
-    onlineDevices: 20,
-    offlineDevices: 2,
-    dataCompleteness: 95.1,
-    pm25: 29.2,
-    pm10: 46.8,
-    districts: 8,
-    uptime: 97.8,
-    aqiGood: 12,
-    aqiModerate: 8,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 1,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 93.2,
-    devicesList: [
-      {
-        id: "KE001",
-        name: "Nairobi CBD",
-        status: "online",
-        lastUpdate: "7 min ago",
-        pm25: 28.7,
-        pm10: 45.9,
-        batteryLevel: 88,
-        signalStrength: 92,
-      },
-      {
-        id: "KE002",
-        name: "Mombasa Road",
-        status: "online",
-        lastUpdate: "12 min ago",
-        pm25: 26.3,
-        pm10: 43.1,
-        batteryLevel: 75,
-        signalStrength: 87,
-      },
-      {
-        id: "KE003",
-        name: "Kisumu Central",
-        status: "offline",
-        lastUpdate: "1 hr ago",
-        pm25: 30.5,
-        pm10: 48.2,
-        batteryLevel: 20,
-        signalStrength: 25,
-      },
-      {
-        id: "KE004",
-        name: "Nakuru Town",
-        status: "online",
-        lastUpdate: "20 min ago",
-        pm25: 24.8,
-        pm10: 40.3,
-        batteryLevel: 68,
-        signalStrength: 78,
-      },
-    ],
-  },
-  {
-    name: "Tanzania",
-    region: "East Africa",
-    devices: 18,
-    onlineDevices: 16,
-    offlineDevices: 2,
-    dataCompleteness: 94.5,
-    pm25: 26.5,
-    pm10: 43.2,
-    districts: 6,
-    uptime: 96.9,
-    aqiGood: 10,
-    aqiModerate: 7,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 91.8,
-    devicesList: [
-      {
-        id: "TZ001",
-        name: "Dar es Salaam",
-        status: "online",
-        lastUpdate: "15 min ago",
-        pm25: 25.8,
-        pm10: 42.7,
-        batteryLevel: 92,
-        signalStrength: 95,
-      },
-      {
-        id: "TZ002",
-        name: "Arusha",
-        status: "online",
-        lastUpdate: "22 min ago",
-        pm25: 22.4,
-        pm10: 37.9,
-        batteryLevel: 78,
-        signalStrength: 89,
-      },
-      {
-        id: "TZ003",
-        name: "Dodoma",
-        status: "offline",
-        lastUpdate: "1.5 hrs ago",
-        pm25: 28.9,
-        pm10: 46.3,
-        batteryLevel: 10,
-        signalStrength: 15,
-      },
-    ],
-  },
-  {
-    name: "Rwanda",
-    region: "East Africa",
-    devices: 15,
-    onlineDevices: 14,
-    offlineDevices: 1,
-    dataCompleteness: 97.8,
-    pm25: 24.1,
-    pm10: 39.5,
-    districts: 5,
-    uptime: 99.1,
-    aqiGood: 11,
-    aqiModerate: 4,
-    aqiUhfsg: 0,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 96.5,
-    devicesList: [
-      {
-        id: "RW001",
-        name: "Kigali Central",
-        status: "online",
-        lastUpdate: "5 min ago",
-        pm25: 23.1,
-        pm10: 38.4,
-        batteryLevel: 95,
-        signalStrength: 98,
-      },
-      {
-        id: "RW002",
-        name: "Musanze",
-        status: "online",
-        lastUpdate: "18 min ago",
-        pm25: 21.7,
-        pm10: 36.2,
-        batteryLevel: 82,
-        signalStrength: 90,
-      },
-      {
-        id: "RW003",
-        name: "Huye",
-        status: "online",
-        lastUpdate: "25 min ago",
-        pm25: 22.9,
-        pm10: 37.8,
-        batteryLevel: 78,
-        signalStrength: 85,
-      },
-    ],
-  },
-  {
-    name: "Nigeria",
-    region: "West Africa",
-    devices: 20,
-    onlineDevices: 17,
-    offlineDevices: 3,
-    dataCompleteness: 93.2,
-    pm25: 32.5,
-    pm10: 53.8,
-    districts: 7,
-    uptime: 95.4,
-    aqiGood: 8,
-    aqiModerate: 9,
-    aqiUhfsg: 2,
-    aqiUnhealthy: 1,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 89.5,
-    devicesList: [
-      {
-        id: "NG001",
-        name: "Lagos Island",
-        status: "online",
-        lastUpdate: "12 min ago",
-        pm25: 31.8,
-        pm10: 52.4,
-        batteryLevel: 70,
-        signalStrength: 80,
-      },
-      {
-        id: "NG002",
-        name: "Abuja Central",
-        status: "online",
-        lastUpdate: "20 min ago",
-        pm25: 29.5,
-        pm10: 48.7,
-        batteryLevel: 65,
-        signalStrength: 75,
-      },
-      {
-        id: "NG003",
-        name: "Port Harcourt",
-        status: "offline",
-        lastUpdate: "2 hrs ago",
-        pm25: 34.2,
-        pm10: 56.1,
-        batteryLevel: 15,
-        signalStrength: 20,
-      },
-    ],
-  },
-  {
-    name: "Ghana",
-    region: "West Africa",
-    devices: 15,
-    onlineDevices: 13,
-    offlineDevices: 2,
-    dataCompleteness: 91.5,
-    pm25: 31.8,
-    pm10: 51.2,
-    districts: 5,
-    uptime: 94.8,
-    aqiGood: 6,
-    aqiModerate: 7,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 1,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 88.3,
-    devicesList: [
-      {
-        id: "GH001",
-        name: "Accra Central",
-        status: "online",
-        lastUpdate: "15 min ago",
-        pm25: 30.5,
-        pm10: 49.8,
-        batteryLevel: 68,
-        signalStrength: 78,
-      },
-      {
-        id: "GH002",
-        name: "Kumasi",
-        status: "online",
-        lastUpdate: "25 min ago",
-        pm25: 28.7,
-        pm10: 47.2,
-        batteryLevel: 72,
-        signalStrength: 82,
-      },
-      {
-        id: "GH003",
-        name: "Tamale",
-        status: "offline",
-        lastUpdate: "1.5 hrs ago",
-        pm25: 32.4,
-        pm10: 53.1,
-        batteryLevel: 18,
-        signalStrength: 25,
-      },
-    ],
-  },
-  {
-    name: "Egypt",
-    region: "North Africa",
-    devices: 18,
-    onlineDevices: 17,
-    offlineDevices: 1,
-    dataCompleteness: 98.1,
-    pm25: 23.5,
-    pm10: 37.8,
-    districts: 6,
-    uptime: 99.3,
-    aqiGood: 12,
-    aqiModerate: 5,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 97.2,
-    devicesList: [
-      {
-        id: "EG001",
-        name: "Cairo Downtown",
-        status: "online",
-        lastUpdate: "8 min ago",
-        pm25: 22.8,
-        pm10: 36.9,
-        batteryLevel: 90,
-        signalStrength: 95,
-      },
-      {
-        id: "EG002",
-        name: "Alexandria",
-        status: "online",
-        lastUpdate: "17 min ago",
-        pm25: 21.5,
-        pm10: 35.2,
-        batteryLevel: 85,
-        signalStrength: 90,
-      },
-      {
-        id: "EG003",
-        name: "Giza",
-        status: "online",
-        lastUpdate: "22 min ago",
-        pm25: 23.7,
-        pm10: 38.4,
-        batteryLevel: 82,
-        signalStrength: 88,
-      },
-    ],
-  },
-  {
-    name: "South Africa",
-    region: "Southern Africa",
-    devices: 24,
-    onlineDevices: 22,
-    offlineDevices: 2,
-    dataCompleteness: 95.8,
-    pm25: 25.2,
-    pm10: 41.5,
-    districts: 8,
-    uptime: 98.1,
-    aqiGood: 14,
-    aqiModerate: 8,
-    aqiUhfsg: 2,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 94.3,
-    devicesList: [
-      {
-        id: "ZA001",
-        name: "Johannesburg CBD",
-        status: "online",
-        lastUpdate: "10 min ago",
-        pm25: 24.7,
-        pm10: 40.8,
-        batteryLevel: 88,
-        signalStrength: 92,
-      },
-      {
-        id: "ZA002",
-        name: "Cape Town",
-        status: "online",
-        lastUpdate: "15 min ago",
-        pm25: 22.9,
-        pm10: 38.5,
-        batteryLevel: 85,
-        signalStrength: 90,
-      },
-      {
-        id: "ZA003",
-        name: "Durban",
-        status: "online",
-        lastUpdate: "20 min ago",
-        pm25: 25.6,
-        pm10: 42.3,
-        batteryLevel: 80,
-        signalStrength: 85,
-      },
-      {
-        id: "ZA004",
-        name: "Pretoria",
-        status: "offline",
-        lastUpdate: "1 hr ago",
-        pm25: 27.8,
-        pm10: 45.2,
-        batteryLevel: 25,
-        signalStrength: 30,
-      },
-    ],
-  },
-]
-
-// Sample district data
-const districtData = [
-  {
-    name: "Kampala",
-    country: "Uganda",
-    region: "East Africa",
-    devices: 12,
-    onlineDevices: 11,
-    offlineDevices: 1,
-    dataCompleteness: 97.2,
-    pm25: 29.5,
-    pm10: 47.8,
-    uptime: 98.7,
-    aqiGood: 7,
-    aqiModerate: 4,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 95.8,
-    devicesList: [
-      {
-        id: "KLA001",
-        name: "Nakasero",
-        status: "online",
-        lastUpdate: "5 min ago",
-        pm25: 28.7,
-        pm10: 46.9,
-        batteryLevel: 90,
-        signalStrength: 95,
-      },
-      {
-        id: "KLA002",
-        name: "Kololo",
-        status: "online",
-        lastUpdate: "12 min ago",
-        pm25: 27.5,
-        pm10: 45.2,
-        batteryLevel: 85,
-        signalStrength: 90,
-      },
-      {
-        id: "KLA003",
-        name: "Bugolobi",
-        status: "online",
-        lastUpdate: "18 min ago",
-        pm25: 29.1,
-        pm10: 47.5,
-        batteryLevel: 80,
-        signalStrength: 85,
-      },
-      {
-        id: "KLA004",
-        name: "Makindye",
-        status: "offline",
-        lastUpdate: "1.5 hrs ago",
-        pm25: 31.2,
-        pm10: 50.3,
-        batteryLevel: 20,
-        signalStrength: 25,
-      },
-    ],
-  },
-  {
-    name: "Wakiso",
-    country: "Uganda",
-    region: "East Africa",
-    devices: 8,
-    onlineDevices: 7,
-    offlineDevices: 1,
-    dataCompleteness: 95.8,
-    pm25: 27.2,
-    pm10: 43.5,
-    uptime: 97.9,
-    aqiGood: 5,
-    aqiModerate: 2,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 93.5,
-    devicesList: [
-      {
-        id: "WAK001",
-        name: "Nansana",
-        status: "online",
-        lastUpdate: "10 min ago",
-        pm25: 26.8,
-        pm10: 42.9,
-        batteryLevel: 85,
-        signalStrength: 90,
-      },
-      {
-        id: "WAK002",
-        name: "Entebbe",
-        status: "online",
-        lastUpdate: "15 min ago",
-        pm25: 25.9,
-        pm10: 41.7,
-        batteryLevel: 80,
-        signalStrength: 85,
-      },
-      {
-        id: "WAK003",
-        name: "Kira",
-        status: "offline",
-        lastUpdate: "2 hrs ago",
-        pm25: 28.4,
-        pm10: 45.8,
-        batteryLevel: 15,
-        signalStrength: 20,
-      },
-    ],
-  },
-  {
-    name: "Nairobi",
-    country: "Kenya",
-    region: "East Africa",
-    devices: 10,
-    onlineDevices: 9,
-    offlineDevices: 1,
-    dataCompleteness: 96.5,
-    pm25: 30.1,
-    pm10: 48.2,
-    uptime: 98.2,
-    aqiGood: 6,
-    aqiModerate: 3,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 94.7,
-    devicesList: [
-      {
-        id: "NBO001",
-        name: "Westlands",
-        status: "online",
-        lastUpdate: "8 min ago",
-        pm25: 29.5,
-        pm10: 47.3,
-        batteryLevel: 88,
-        signalStrength: 92,
-      },
-      {
-        id: "NBO002",
-        name: "Kibera",
-        status: "online",
-        lastUpdate: "14 min ago",
-        pm25: 31.2,
-        pm10: 49.8,
-        batteryLevel: 82,
-        signalStrength: 88,
-      },
-      {
-        id: "NBO003",
-        name: "Karen",
-        status: "online",
-        lastUpdate: "20 min ago",
-        pm25: 28.7,
-        pm10: 46.2,
-        batteryLevel: 78,
-        signalStrength: 85,
-      },
-      {
-        id: "NBO004",
-        name: "Eastleigh",
-        status: "offline",
-        lastUpdate: "1 hr ago",
-        pm25: 32.5,
-        pm10: 51.4,
-        batteryLevel: 22,
-        signalStrength: 25,
-      },
-    ],
-  },
-  {
-    name: "Mombasa",
-    country: "Kenya",
-    region: "East Africa",
-    devices: 6,
-    onlineDevices: 5,
-    offlineDevices: 1,
-    dataCompleteness: 94.2,
-    pm25: 28.5,
-    pm10: 45.8,
-    uptime: 97.1,
-    aqiGood: 3,
-    aqiModerate: 2,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 92.8,
-    devicesList: [
-      {
-        id: "MSA001",
-        name: "Nyali",
-        status: "online",
-        lastUpdate: "12 min ago",
-        pm25: 27.9,
-        pm10: 44.8,
-        batteryLevel: 85,
-        signalStrength: 90,
-      },
-      {
-        id: "MSA002",
-        name: "Likoni",
-        status: "online",
-        lastUpdate: "18 min ago",
-        pm25: 28.7,
-        pm10: 46.2,
-        batteryLevel: 80,
-        signalStrength: 85,
-      },
-      {
-        id: "MSA003",
-        name: "Bamburi",
-        status: "offline",
-        lastUpdate: "1.5 hrs ago",
-        pm25: 29.5,
-        pm10: 47.3,
-        batteryLevel: 18,
-        signalStrength: 22,
-      },
-    ],
-  },
-  {
-    name: "Dar es Salaam",
-    country: "Tanzania",
-    region: "East Africa",
-    devices: 9,
-    onlineDevices: 8,
-    offlineDevices: 1,
-    dataCompleteness: 95.1,
-    pm25: 27.8,
-    pm10: 44.2,
-    uptime: 96.8,
-    aqiGood: 5,
-    aqiModerate: 3,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 93.2,
-    devicesList: [
-      {
-        id: "DSM001",
-        name: "Mikocheni",
-        status: "online",
-        lastUpdate: "10 min ago",
-        pm25: 26.9,
-        pm10: 43.5,
-        batteryLevel: 88,
-        signalStrength: 92,
-      },
-      {
-        id: "DSM002",
-        name: "Kinondoni",
-        status: "online",
-        lastUpdate: "15 min ago",
-        pm25: 27.5,
-        pm10: 44.1,
-        batteryLevel: 85,
-        signalStrength: 90,
-      },
-      {
-        id: "DSM003",
-        name: "Ilala",
-        status: "online",
-        lastUpdate: "22 min ago",
-        pm25: 28.2,
-        pm10: 45.3,
-        batteryLevel: 80,
-        signalStrength: 85,
-      },
-      {
-        id: "DSM004",
-        name: "Temeke",
-        status: "offline",
-        lastUpdate: "1 hr ago",
-        pm25: 29.8,
-        pm10: 47.2,
-        batteryLevel: 20,
-        signalStrength: 25,
-      },
-    ],
-  },
-  {
-    name: "Kigali",
-    country: "Rwanda",
-    region: "East Africa",
-    devices: 8,
-    onlineDevices: 8,
-    offlineDevices: 0,
-    dataCompleteness: 98.5,
-    pm25: 23.8,
-    pm10: 38.5,
-    uptime: 99.4,
-    aqiGood: 6,
-    aqiModerate: 2,
-    aqiUhfsg: 0,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 97.8,
-    devicesList: [
-      {
-        id: "KGL001",
-        name: "Nyamirambo",
-        status: "online",
-        lastUpdate: "5 min ago",
-        pm25: 22.9,
-        pm10: 37.5,
-        batteryLevel: 95,
-        signalStrength: 98,
-      },
-      {
-        id: "KGL002",
-        name: "Kimihurura",
-        status: "online",
-        lastUpdate: "12 min ago",
-        pm25: 23.5,
-        pm10: 38.2,
-        batteryLevel: 90,
-        signalStrength: 95,
-      },
-      {
-        id: "KGL003",
-        name: "Kacyiru",
-        status: "online",
-        lastUpdate: "18 min ago",
-        pm25: 24.1,
-        pm10: 39.3,
-        batteryLevel: 88,
-        signalStrength: 92,
-      },
-    ],
-  },
-  {
-    name: "Lagos",
-    country: "Nigeria",
-    region: "West Africa",
-    devices: 12,
-    onlineDevices: 10,
-    offlineDevices: 2,
-    dataCompleteness: 92.8,
-    pm25: 33.5,
-    pm10: 55.2,
-    uptime: 95.2,
-    aqiGood: 4,
-    aqiModerate: 6,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 1,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 90.5,
-    devicesList: [
-      {
-        id: "LOS001",
-        name: "Ikeja",
-        status: "online",
-        lastUpdate: "8 min ago",
-        pm25: 32.8,
-        pm10: 54.2,
-        batteryLevel: 85,
-        signalStrength: 90,
-      },
-      {
-        id: "LOS002",
-        name: "Victoria Island",
-        status: "online",
-        lastUpdate: "15 min ago",
-        pm25: 31.5,
-        pm10: 52.7,
-        batteryLevel: 80,
-        signalStrength: 85,
-      },
-      {
-        id: "LOS003",
-        name: "Lekki",
-        status: "offline",
-        lastUpdate: "1.5 hrs ago",
-        pm25: 34.2,
-        pm10: 56.8,
-        batteryLevel: 18,
-        signalStrength: 22,
-      },
-      {
-        id: "LOS004",
-        name: "Surulere",
-        status: "offline",
-        lastUpdate: "2 hrs ago",
-        pm25: 35.1,
-        pm10: 57.9,
-        batteryLevel: 15,
-        signalStrength: 20,
-      },
-    ],
-  },
-  {
-    name: "Accra",
-    country: "Ghana",
-    region: "West Africa",
-    devices: 8,
-    onlineDevices: 7,
-    offlineDevices: 1,
-    dataCompleteness: 93.2,
-    pm25: 31.2,
-    pm10: 50.5,
-    uptime: 94.9,
-    aqiGood: 3,
-    aqiModerate: 4,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 91.7,
-    devicesList: [
-      {
-        id: "ACC001",
-        name: "Osu",
-        status: "online",
-        lastUpdate: "10 min ago",
-        pm25: 30.5,
-        pm10: 49.8,
-        batteryLevel: 82,
-        signalStrength: 88,
-      },
-      {
-        id: "ACC002",
-        name: "Cantonments",
-        status: "online",
-        lastUpdate: "18 min ago",
-        pm25: 29.8,
-        pm10: 48.5,
-        batteryLevel: 78,
-        signalStrength: 85,
-      },
-      {
-        id: "ACC003",
-        name: "Airport Residential",
-        status: "offline",
-        lastUpdate: "1 hr ago",
-        pm25: 32.4,
-        pm10: 52.1,
-        batteryLevel: 20,
-        signalStrength: 25,
-      },
-    ],
-  },
-  {
-    name: "Cairo",
-    country: "Egypt",
-    region: "North Africa",
-    devices: 10,
-    onlineDevices: 10,
-    offlineDevices: 0,
-    dataCompleteness: 98.8,
-    pm25: 22.8,
-    pm10: 36.5,
-    uptime: 99.5,
-    aqiGood: 7,
-    aqiModerate: 3,
-    aqiUhfsg: 0,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 97.9,
-    devicesList: [
-      {
-        id: "CAI001",
-        name: "Zamalek",
-        status: "online",
-        lastUpdate: "5 min ago",
-        pm25: 21.9,
-        pm10: 35.4,
-        batteryLevel: 95,
-        signalStrength: 98,
-      },
-      {
-        id: "CAI002",
-        name: "Maadi",
-        status: "online",
-        lastUpdate: "12 min ago",
-        pm25: 22.5,
-        pm10: 36.2,
-        batteryLevel: 90,
-        signalStrength: 95,
-      },
-      {
-        id: "CAI003",
-        name: "Heliopolis",
-        status: "online",
-        lastUpdate: "18 min ago",
-        pm25: 23.2,
-        pm10: 37.1,
-        batteryLevel: 88,
-        signalStrength: 92,
-      },
-    ],
-  },
-  {
-    name: "Johannesburg",
-    country: "South Africa",
-    region: "Southern Africa",
-    devices: 14,
-    onlineDevices: 13,
-    offlineDevices: 1,
-    dataCompleteness: 96.2,
-    pm25: 24.5,
-    pm10: 40.2,
-    uptime: 98.3,
-    aqiGood: 8,
-    aqiModerate: 5,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 95.1,
-    devicesList: [
-      {
-        id: "JHB001",
-        name: "Sandton",
-        status: "online",
-        lastUpdate: "7 min ago",
-        pm25: 23.8,
-        pm10: 39.5,
-        batteryLevel: 90,
-        signalStrength: 95,
-      },
-      {
-        id: "JHB002",
-        name: "Soweto",
-        status: "online",
-        lastUpdate: "15 min ago",
-        pm25: 24.9,
-        pm10: 40.8,
-        batteryLevel: 85,
-        signalStrength: 90,
-      },
-      {
-        id: "JHB003",
-        name: "Rosebank",
-        status: "online",
-        lastUpdate: "20 min ago",
-        pm25: 24.2,
-        pm10: 39.7,
-        batteryLevel: 82,
-        signalStrength: 88,
-      },
-      {
-        id: "JHB004",
-        name: "Braamfontein",
-        status: "offline",
-        lastUpdate: "1.5 hrs ago",
-        pm25: 25.8,
-        pm10: 42.3,
-        batteryLevel: 18,
-        signalStrength: 22,
-      },
-    ],
-  },
-]
-
-// Sample village data
-const villageData = [
-  {
-    name: "Nakasero",
-    district: "Kampala",
-    country: "Uganda",
-    region: "East Africa",
-    devices: 5,
-    onlineDevices: 5,
-    offlineDevices: 0,
-    dataCompleteness: 98.5,
-    pm25: 30.2,
-    pm10: 49.1,
-    uptime: 99.2,
-    aqiGood: 3,
-    aqiModerate: 2,
-    aqiUhfsg: 0,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 97.8,
-    devicesList: [
-      {
-        id: "NAK001",
-        name: "Parliament Avenue",
-        status: "online",
-        lastUpdate: "5 min ago",
-        pm25: 29.8,
-        pm10: 48.5,
-        batteryLevel: 92,
-        signalStrength: 95,
-      },
-      {
-        id: "NAK002",
-        name: "Kampala Road",
-        status: "online",
-        lastUpdate: "12 min ago",
-        pm25: 30.5,
-        pm10: 49.7,
-        batteryLevel: 88,
-        signalStrength: 92,
-      },
-    ],
-  },
-  {
-    name: "Kololo",
-    district: "Kampala",
-    country: "Uganda",
-    region: "East Africa",
-    devices: 4,
-    onlineDevices: 3,
-    offlineDevices: 1,
-    dataCompleteness: 96.8,
-    pm25: 28.9,
-    pm10: 46.5,
-    uptime: 97.5,
-    aqiGood: 2,
-    aqiModerate: 1,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 95.2,
-    devicesList: [
-      {
-        id: "KOL001",
-        name: "Upper Kololo",
-        status: "online",
-        lastUpdate: "8 min ago",
-        pm25: 28.2,
-        pm10: 45.9,
-        batteryLevel: 85,
-        signalStrength: 90,
-      },
-      {
-        id: "KOL002",
-        name: "Kololo Airstrip",
-        status: "offline",
-        lastUpdate: "1.5 hrs ago",
-        pm25: 29.5,
-        pm10: 47.8,
-        batteryLevel: 20,
-        signalStrength: 25,
-      },
-    ],
-  },
-  {
-    name: "Bugolobi",
-    district: "Kampala",
-    country: "Uganda",
-    region: "East Africa",
-    devices: 3,
-    onlineDevices: 3,
-    offlineDevices: 0,
-    dataCompleteness: 97.1,
-    pm25: 29.4,
-    pm10: 47.8,
-    uptime: 98.9,
-    aqiGood: 2,
-    aqiModerate: 1,
-    aqiUhfsg: 0,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 96.5,
-    devicesList: [
-      {
-        id: "BUG001",
-        name: "Bugolobi Flats",
-        status: "online",
-        lastUpdate: "10 min ago",
-        pm25: 29.1,
-        pm10: 47.3,
-        batteryLevel: 88,
-        signalStrength: 92,
-      },
-      {
-        id: "BUG002",
-        name: "Luthuli Avenue",
-        status: "online",
-        lastUpdate: "15 min ago",
-        pm25: 29.7,
-        pm10: 48.2,
-        batteryLevel: 85,
-        signalStrength: 90,
-      },
-    ],
-  },
-  {
-    name: "Nansana",
-    district: "Wakiso",
-    country: "Uganda",
-    region: "East Africa",
-    devices: 4,
-    onlineDevices: 3,
-    offlineDevices: 1,
-    dataCompleteness: 94.8,
-    pm25: 27.5,
-    pm10: 44.2,
-    uptime: 97.2,
-    aqiGood: 2,
-    aqiModerate: 1,
-    aqiUhfsg: 1,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 93.5,
-    devicesList: [
-      {
-        id: "NAN001",
-        name: "Nansana East",
-        status: "online",
-        lastUpdate: "12 min ago",
-        pm25: 27.1,
-        pm10: 43.8,
-        batteryLevel: 82,
-        signalStrength: 88,
-      },
-      {
-        id: "NAN002",
-        name: "Nansana West",
-        status: "offline",
-        lastUpdate: "2 hrs ago",
-        pm25: 28.4,
-        pm10: 45.9,
-        batteryLevel: 18,
-        signalStrength: 22,
-      },
-    ],
-  },
-  {
-    name: "Entebbe",
-    district: "Wakiso",
-    country: "Uganda",
-    region: "East Africa",
-    devices: 4,
-    onlineDevices: 4,
-    offlineDevices: 0,
-    dataCompleteness: 96.7,
-    pm25: 26.8,
-    pm10: 42.9,
-    uptime: 98.6,
-    aqiGood: 3,
-    aqiModerate: 1,
-    aqiUhfsg: 0,
-    aqiUnhealthy: 0,
-    aqiVeryUnhealthy: 0,
-    aqiHazardous: 0,
-    dataTransmissionRate: 95.8,
-    devicesList: [
-      {
-        id: "ENT001",
-        name: "Entebbe Airport",
-        status: "online",
-        lastUpdate: "7 min ago",
-        pm25: 26.5,
-        pm10: 42.3,
-        batteryLevel: 90,
-        signalStrength: 95,
-      },
-      {
-        id: "ENT002",
-        name: "Entebbe Town",
-        status: "online",
-        lastUpdate: "15 min ago",
-        pm25: 27.1,
-        pm10: 43.5,
-        batteryLevel: 85,
-        signalStrength: 90,
-      },
-    ],
-  },
-]
-
-// Sample site data for site-specific analysis
-const sitesList = [
-  { id: "kampala", name: "Kampala City", adminLevel: "City", sites: 12 },
-  { id: "nairobi", name: "Nairobi", adminLevel: "City", sites: 10 },
-  { id: "dar", name: "Dar es Salaam", adminLevel: "City", sites: 8 },
-  { id: "kigali", name: "Kigali", adminLevel: "City", sites: 6 },
-  { id: "gulu", name: "Gulu City", adminLevel: "City", sites: 7 },
-  { id: "mbarara", name: "Mbarara", adminLevel: "City", sites: 5 },
-  { id: "jinja", name: "Jinja", adminLevel: "City", sites: 4 },
-]
-
-// Sample air quality data for sites
-const siteAirQualityData = {
-  kampala: { good: 3, moderate: 5, unhealthySensitive: 2, unhealthy: 1, veryUnhealthy: 1, hazardous: 0 },
-  nairobi: { good: 2, moderate: 4, unhealthySensitive: 3, unhealthy: 1, veryUnhealthy: 0, hazardous: 0 },
-  dar: { good: 1, moderate: 3, unhealthySensitive: 2, unhealthy: 2, veryUnhealthy: 0, hazardous: 0 },
-  kigali: { good: 2, moderate: 3, unhealthySensitive: 1, unhealthy: 0, veryUnhealthy: 0, hazardous: 0 },
-  gulu: { good: 0, moderate: 7, unhealthySensitive: 0, unhealthy: 0, veryUnhealthy: 0, hazardous: 0 },
-  mbarara: { good: 1, moderate: 2, unhealthySensitive: 1, unhealthy: 1, veryUnhealthy: 0, hazardous: 0 },
-  jinja: { good: 1, moderate: 2, unhealthySensitive: 1, unhealthy: 0, veryUnhealthy: 0, hazardous: 0 },
-}
-
-// Sample site performance data
-const sitePerformanceData = {
-  kampala: [
-    { date: "2024-06-01", pm25: 28, pm10: 45, uptime: 98 },
-    { date: "2024-06-02", pm25: 32, pm10: 52, uptime: 97 },
-    { date: "2024-06-03", pm25: 35, pm10: 58, uptime: 99 },
-    { date: "2024-06-04", pm25: 30, pm10: 48, uptime: 100 },
-    { date: "2024-06-05", pm25: 25, pm10: 42, uptime: 98 },
-    { date: "2024-06-06", pm25: 22, pm10: 38, uptime: 97 },
-    { date: "2024-06-07", pm25: 18, pm10: 32, uptime: 99 },
-  ],
-  gulu: [
-    { date: "2024-06-01", pm25: 22, pm10: 38, uptime: 100 },
-    { date: "2024-06-02", pm25: 24, pm10: 42, uptime: 100 },
-    { date: "2024-06-03", pm25: 26, pm10: 45, uptime: 98 },
-    { date: "2024-06-04", pm25: 28, pm10: 48, uptime: 97 },
-    { date: "2024-06-05", pm25: 25, pm10: 44, uptime: 99 },
-    { date: "2024-06-06", pm25: 23, pm10: 40, uptime: 100 },
-    { date: "2024-06-07", pm25: 21, pm10: 36, uptime: 100 },
-  ],
-}
-
-// Regional summary data
-const regionalSummaryData = {
-  regions: 5,
-  totalDevices: 160,
-  countries: 12,
-  countriesDevices: 160,
-  districts: 48,
-  districtsWithDevices: 42,
-  onlineDevices: 143,
-  offlineDevices: 17,
-  dataCompleteness: 94.2,
-  averagePM25: 28.4,
-  averagePM10: 45.6,
+// AQI color mapping - keeping this as it's configuration, not static data
+const aqiColors = {
+  good: "#4CAF50",
+  moderate: "#FFC107",
+  unhealthySensitive: "#FF9800",
+  unhealthy: "#F44336",
+  veryUnhealthy: "#9C27B0",
+  hazardous: "#B71C1C",
 }
 
 // Function to format number with units
@@ -1438,145 +63,477 @@ function formatNumber(value, decimals = 1) {
   return Number(value).toFixed(decimals) + " μg/m³"
 }
 
-// AQI color mapping
-const aqiColors = {
-  good: "#4CAF50",
-  moderate: "#FFC107",
-  unhealthySensitive: "#FF9800",
-  unhealthy: "#F44336",
-  veryUnhealthy: "#9C27B0",
-  hazardous: "#B71C1C",
-}
-
-// PM2.5 time series data for comparison charts
-const pm25TimeSeriesData = [
-  { date: "4/18/2025", pm25: 9, pm10: 3 },
-  { date: "4/19/2025", pm25: 26, pm10: 36 },
-  { date: "4/20/2025", pm25: 17, pm10: 22 },
-  { date: "4/21/2025", pm25: 19, pm10: 25 },
-  { date: "4/22/2025", pm25: 22, pm10: 31 },
-  { date: "4/23/2025", pm25: 17, pm10: 16 },
-  { date: "4/24/2025", pm25: 18, pm10: 21 },
-  { date: "4/25/2025", pm25: 16, pm10: 18 },
-]
-
 export default function AnalyticsPage() {
+  // State variables
   const [timeRange, setTimeRange] = useState("month")
   const [activeTab, setActiveTab] = useState("network")
-  const [selectedSite, setSelectedSite] = useState("kampala")
-  const [selectedRegion, setSelectedRegion] = useState("East Africa")
-  const [selectedRegionForCountry, setSelectedRegionForCountry] = useState("East Africa")
-  const [selectedCountry, setSelectedCountry] = useState("Uganda")
-  const [selectedRegionForDistrict, setSelectedRegionForDistrict] = useState("East Africa")
-  const [selectedCountryForDistrict, setSelectedCountryForDistrict] = useState("Uganda")
-  const [selectedDistrict, setSelectedDistrict] = useState("Kampala")
-  const [selectedLocation, setSelectedLocation] = useState("Nakasero")
+  const [selectedSite, setSelectedSite] = useState("")
+  const [selectedRegion, setSelectedRegion] = useState("")
+  const [selectedRegionForCountry, setSelectedRegionForCountry] = useState("")
+  const [selectedCountry, setSelectedCountry] = useState("")
+  const [selectedRegionForDistrict, setSelectedRegionForDistrict] = useState("")
+  const [selectedCountryForDistrict, setSelectedCountryForDistrict] = useState("")
+  const [selectedDistrict, setSelectedDistrict] = useState("")
+  const [selectedLocation, setSelectedLocation] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [isLoading, setIsLoading] = useState(false)
+  const [hasError, setHasError] = useState(false)
+  
+  // Data states - replace static data with these states
+  const [regionalSummaryData, setRegionalSummaryData] = useState({
+    regions: 6,
+    totalDevices: 243,
+    countries: 9,
+    countriesDevices: 243,
+    districts: 44,
+    districtsWithDevices: 44,
+    onlineDevices: 158,
+    offlineDevices: 85,
+    dataCompleteness: 65,
+    averagePM25: 20.6,
+    averagePM10: 25,
+  })
+  
+  const [regionalComparisonData, setRegionalComparisonData] = useState([])
+  const [countryData, setCountryData] = useState([])
+  const [districtData, setDistrictData] = useState([])
+  const [villageData, setVillageData] = useState([])
+  const [sitesList, setSitesList] = useState([])
+  const [siteAirQualityData, setSiteAirQualityData] = useState({})
+  const [sitePerformanceData, setSitePerformanceData] = useState({})
 
+  // Fetch data when component mounts or when dependencies change
+  useEffect(() => {
+    // Call your API endpoints here to fetch real data
+    fetchSummaryData()
+    fetchRegionalData()
+    fetchCountryData()
+    fetchDistrictData()
+    fetchVillageData()
+    fetchSitesData()
+  }, [])
+
+  // When time range changes, refetch time-dependent data
+  useEffect(() => {
+    fetchTimeRangeData()
+  }, [timeRange])
+
+  const fetchSummaryData = async () => {
+    try {
+      setIsLoading(true);
+      setHasError(false);
+      
+      // Use the network summary endpoint with the full URL
+      const response = await fetch(`${API_BASE_URL}/network-analysis/summary`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Summary data from API:', data);
+      
+      // Map the API response directly to our state structure
+      setRegionalSummaryData({
+        regions: data.regions || 0,
+        totalDevices: data.totalDevices || 0,
+        countries: data.countries || 0,
+        countriesDevices: data.totalDevices || 0, // Using totalDevices since there's no specific countriesDevices field
+        districts: data.districts || 0,
+        districtsWithDevices: data.districts || 0, // Assuming all districts have devices
+        onlineDevices: data.onlineDevices || 0,
+        offlineDevices: data.offlineDevices || 0,
+        dataCompleteness: data.dataCompleteness || 0,
+        averagePM25: data.averagePM25 || 0,
+        averagePM10: data.averagePM10 || 0,
+      });
+      
+      // You can also store the regionsData for more detailed analysis
+      if (data.regionsData) {
+        setRegionalComparisonData(data.regionsData.map(region => ({
+          region: region.region,
+          deviceCount: region.deviceCount || 0,
+          onlineDevices: region.onlineDevices || 0,
+          offlineDevices: region.offlineDevices || 0,
+          dataTransmissionRate: region.dataTransmissionRate || 0,
+          dataCompleteness: region.dataCompleteness || 0,
+          pm25: region.pm25 || 0,
+          pm10: region.pm10 || 0,
+          // AQI distribution data
+          aqiGood: region.aqiGood || 0,
+          aqiModerate: region.aqiModerate || 0,
+          aqiUhfsg: region.aqiUhfsg || 0,
+          aqiUnhealthy: region.aqiUnhealthy || 0,
+          aqiVeryUnhealthy: region.aqiVeryUnhealthy || 0,
+          aqiHazardous: region.aqiHazardous || 0,
+          // Additional data
+          countries: region.countries || 0,
+          districts: region.districts || 0,
+        })));
+      }
+    } catch (error) {
+      console.error("Error fetching summary data:", error);
+      setHasError(true);
+      
+      // If we can't fetch data from the API, use hard-coded data from the image for demo purposes
+      setRegionalSummaryData({
+        regions: 6,
+        totalDevices: 243,
+        countries: 9,
+        countriesDevices: 243,
+        districts: 44,
+        districtsWithDevices: 44,
+        onlineDevices: 158,
+        offlineDevices: 85,
+        dataCompleteness: 65,
+        averagePM25: 20.6,
+        averagePM10: 25,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchRegionalData = async () => {
+    try {
+      // Actual API call to the regional data endpoint
+      const response = await fetch(`${API_BASE_URL}/network-analysis/regional`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      // Process the regions data 
+      if (result.regions && Array.isArray(result.regions)) {
+        const regionsData = result.regions.map(region => {
+          // Extract relevant data from the region.data object
+          const regionData = region.data || {};
+          
+          return {
+            region: region.region,
+            deviceCount: regionData.deviceCount || 0,
+            onlineDevices: regionData.onlineDevices || 0,
+            offlineDevices: regionData.offlineDevices || 0,
+            dataTransmissionRate: regionData.dataTransmissionRate || 0,
+            dataCompleteness: regionData.dataCompleteness || 0,
+            pm25: regionData.pm25 || 0,
+            pm10: regionData.pm10 || 0,
+            // Add AQI distribution data
+            aqiGood: regionData.aqiGood || 0,
+            aqiModerate: regionData.aqiModerate || 0,
+            aqiUhfsg: regionData.aqiUhfsg || 0,
+            aqiUnhealthy: regionData.aqiUnhealthy || 0,
+            aqiVeryUnhealthy: regionData.aqiVeryUnhealthy || 0,
+            aqiHazardous: regionData.aqiHazardous || 0,
+            // Add more fields
+            countries: regionData.countries || 0,
+            districts: regionData.districts || 0,
+          };
+        });
+        
+        setRegionalComparisonData(regionsData);
+        
+        // Set default selected region if we have data
+        if (regionsData.length > 0 && !selectedRegion) {
+          setSelectedRegion(regionsData[0].region);
+          setSelectedRegionForCountry(regionsData[0].region);
+          setSelectedRegionForDistrict(regionsData[0].region);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching regional data:", error);
+      // Keep existing regional data if error occurs
+    }
+  }
+
+  const fetchCountryData = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/network-analysis/countries`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      // Process the countries data
+      if (result.countries && Array.isArray(result.countries)) {
+        const countriesData = result.countries.map(country => {
+          // Extract relevant data from the country.data object
+          const countryData = country.data || {};
+          
+          return {
+            name: country.country,
+            region: countryData.region || 'Unknown',
+            deviceCount: countryData.deviceCount || 0,
+            onlineDevices: countryData.onlineDevices || 0,
+            offlineDevices: countryData.offlineDevices || 0,
+            dataTransmissionRate: countryData.dataTransmissionRate || 0,
+            dataCompleteness: countryData.dataCompleteness || 0,
+            pm25: countryData.pm25 || 0,
+            pm10: countryData.pm10 || 0,
+            // Add AQI distribution data
+            aqiGood: countryData.aqiGood || 0,
+            aqiModerate: countryData.aqiModerate || 0,
+            aqiUhfsg: countryData.aqiUhfsg || 0,
+            aqiUnhealthy: countryData.aqiUnhealthy || 0,
+            aqiVeryUnhealthy: countryData.aqiVeryUnhealthy || 0,
+            aqiHazardous: countryData.aqiHazardous || 0,
+            // Map devicesList if available
+            devicesList: countryData.devicesList || []
+          };
+        });
+        
+        setCountryData(countriesData);
+        
+        // Set default selected country if we have data
+        if (countriesData.length > 0 && !selectedCountry) {
+          setSelectedCountry(countriesData[0].name);
+          setSelectedCountryForDistrict(countriesData[0].name);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching country data:", error);
+      setCountryData([]);
+    }
+  }
+
+  const fetchDistrictData = async () => {
+    try {
+      // If we have a selected country, filter by it
+      const url = selectedCountryForDistrict 
+        ? `${API_BASE_URL}/network-analysis/districts?country=${encodeURIComponent(selectedCountryForDistrict)}`
+        : `${API_BASE_URL}/network-analysis/districts`;
+        
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.districts && Array.isArray(result.districts)) {
+        // Process the districts data
+        const districtsData = result.districts.map(district => {
+          // Extract relevant data from the district.data object
+          const districtData = district.data || {};
+          
+          return {
+            name: district.district,
+            country: district.country,
+            deviceCount: districtData.devices || 0,
+            onlineDevices: districtData.onlineDevices || 0,
+            offlineDevices: districtData.offlineDevices || 0,
+            dataTransmissionRate: districtData.dataTransmissionRate || 0,
+            dataCompleteness: districtData.dataCompleteness || 0,
+            pm25: districtData.pm25 || 0,
+            pm10: districtData.pm10 || 0,
+            // Add AQI distribution data
+            aqiGood: districtData.aqiGood || 0,
+            aqiModerate: districtData.aqiModerate || 0,
+            aqiUhfsg: districtData.aqiUhfsg || 0,
+            aqiUnhealthy: districtData.aqiUnhealthy || 0,
+            aqiVeryUnhealthy: districtData.aqiVeryUnhealthy || 0,
+            aqiHazardous: districtData.aqiHazardous || 0,
+            // Map devicesList if available
+            devicesList: districtData.devicesList || []
+          };
+        });
+        
+        setDistrictData(districtsData);
+        
+        // Set default selected district if we have data
+        if (districtsData.length > 0 && !selectedDistrict) {
+          setSelectedDistrict(districtsData[0].name);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching district data:", error);
+      setDistrictData([]);
+    }
+  }
+
+  const fetchVillageData = async () => {
+    // This function would need to be implemented when there's an API endpoint for village data
+    try {
+      // For now, this is a placeholder
+      setVillageData([]);
+      
+      // Set default selected location if we have data
+      if (villageData.length > 0 && !selectedLocation) {
+        setSelectedLocation(villageData[0].name);
+      }
+    } catch (error) {
+      console.error("Error fetching village data:", error);
+      setVillageData([]);
+    }
+  }
+
+  const fetchSitesData = async () => {
+    // This function would need to be implemented when there's an API endpoint for sites data
+    try {
+      // For now, these are placeholders
+      setSitesList([]);
+      setSiteAirQualityData({});
+      setSitePerformanceData({});
+      
+      // Set default selected site if we have data
+      if (sitesList.length > 0 && !selectedSite) {
+        setSelectedSite(sitesList[0].id);
+      }
+    } catch (error) {
+      console.error("Error fetching sites data:", error);
+    }
+  }
+
+  const fetchTimeRangeData = async () => {
+    // This would be implemented to fetch time-dependent data based on the selected range
+    try {
+      // For now, this is a placeholder
+      console.log(`Fetching time range data for: ${timeRange}`);
+    } catch (error) {
+      console.error("Error fetching time range data:", error);
+    }
+  }
+
+  // The rest of your component's code (data processing functions, memoization, etc.) remains the same
+  
   // Get the current site data
-  const currentSite = sitesList.find((site) => site.id === selectedSite) || sitesList[0]
-  const currentSiteAirQuality =
-    siteAirQualityData[selectedSite as keyof typeof siteAirQualityData] || siteAirQualityData.kampala
-  const currentSitePerformance =
-    sitePerformanceData[selectedSite as keyof typeof sitePerformanceData] || sitePerformanceData.kampala
+  const currentSite = useMemo(() => {
+    return sitesList.find((site) => site.id === selectedSite) || null
+  }, [sitesList, selectedSite])
+  
+  const currentSiteAirQuality = useMemo(() => {
+    return siteAirQualityData[selectedSite] || null
+  }, [siteAirQualityData, selectedSite])
+  
+  const currentSitePerformance = useMemo(() => {
+    return sitePerformanceData[selectedSite] || []
+  }, [sitePerformanceData, selectedSite])
 
   // Get the selected region data
-  const currentRegion =
-    regionalComparisonData.find((region) => region.region === selectedRegion) || regionalComparisonData[0]
+  const currentRegion = useMemo(() => {
+    return regionalComparisonData.find((region) => region.region === selectedRegion) || null
+  }, [regionalComparisonData, selectedRegion])
 
   // Get the selected country data
-  const currentCountry = countryData.find((country) => country.name === selectedCountry) || countryData[0]
+  const currentCountry = useMemo(() => {
+    return countryData.find((country) => country.name === selectedCountry) || null
+  }, [countryData, selectedCountry])
 
   // Get the selected district data
-  const currentDistrict = districtData.find((district) => district.name === selectedDistrict) || districtData[0]
+  const currentDistrict = useMemo(() => {
+    return districtData.find((district) => district.name === selectedDistrict) || null
+  }, [districtData, selectedDistrict])
 
   // Filter countries based on selected region
-  const countriesInSelectedRegion = countryData.filter((country) => country.region === selectedRegionForCountry)
+  const countriesInSelectedRegion = useMemo(() => {
+    return countryData.filter((country) => country.region === selectedRegionForCountry)
+  }, [countryData, selectedRegionForCountry])
 
   // Filter districts based on selected country
-  const districtsInSelectedCountry = districtData.filter((district) => district.country === selectedCountryForDistrict)
+  const districtsInSelectedCountry = useMemo(() => {
+    return districtData.filter((district) => district.country === selectedCountryForDistrict)
+  }, [districtData, selectedCountryForDistrict])
 
   // Filter locations based on selected district
-  const locationsInSelectedDistrict = villageData.filter((village) => village.district === selectedDistrict)
+  const locationsInSelectedDistrict = useMemo(() => {
+    return villageData.filter((village) => village.district === selectedDistrict)
+  }, [villageData, selectedDistrict])
 
   // Get the selected location data
-  const currentLocation = villageData.find((village) => village.name === selectedLocation) || villageData[0]
+  const currentLocation = useMemo(() => {
+    return villageData.find((village) => village.name === selectedLocation) || null
+  }, [villageData, selectedLocation])
 
   // Filter countries for the regional analysis view
-  const countriesInRegion = countryData.filter((country) => country.region === selectedRegion)
+  const countriesInRegion = useMemo(() => {
+    return countryData.filter((country) => country.region === selectedRegion)
+  }, [countryData, selectedRegion])
 
   // Filter districts for the country analysis view
-  const districtsInCountry = districtData.filter((district) => district.country === selectedCountry)
+  const districtsInCountry = useMemo(() => {
+    return districtData.filter((district) => district.country === selectedCountry)
+  }, [districtData, selectedCountry])
 
   // Find regions with highest and lowest offline devices
   const regionWithMostOfflineDevices = useMemo(() => {
+    if (!regionalComparisonData.length) return null
     return regionalComparisonData.reduce((prev, current) => 
       (prev.offlineDevices > current.offlineDevices) ? prev : current
-    );
-  }, []);
+    )
+  }, [regionalComparisonData])
 
   const regionWithLeastOfflineDevices = useMemo(() => {
+    if (!regionalComparisonData.length) return null
     return regionalComparisonData.reduce((prev, current) => 
       (prev.offlineDevices < current.offlineDevices) ? prev : current
-    );
-  }, []);
+    )
+  }, [regionalComparisonData])
 
   // Find countries with highest and lowest offline devices
   const countryWithMostOfflineDevices = useMemo(() => {
+    if (!countryData.length) return null
     return countryData.reduce((prev, current) => 
       (prev.offlineDevices > current.offlineDevices) ? prev : current
-    );
-  }, []);
+    )
+  }, [countryData])
 
   const countryWithLeastOfflineDevices = useMemo(() => {
+    if (!countryData.length) return null
     return countryData.reduce((prev, current) => 
       (prev.offlineDevices < current.offlineDevices && current.offlineDevices > 0) ? prev : current
-    );
-  }, []);
+    )
+  }, [countryData])
 
   // Find districts with highest and lowest offline devices
   const districtWithMostOfflineDevices = useMemo(() => {
+    if (!districtData.length) return null
     return districtData.reduce((prev, current) => 
       (prev.offlineDevices > current.offlineDevices) ? prev : current
-    );
-  }, []);
+    )
+  }, [districtData])
 
   const districtWithLeastOfflineDevices = useMemo(() => {
+    if (!districtData.length) return null
     return districtData.reduce((prev, current) => 
       (prev.offlineDevices < current.offlineDevices && current.offlineDevices > 0) ? prev : current
-    );
-  }, []);
+    )
+  }, [districtData])
 
   // Find locations with highest and lowest offline devices
   const locationWithMostOfflineDevices = useMemo(() => {
+    if (!villageData.length) return null
     return villageData.reduce((prev, current) => 
       (prev.offlineDevices > current.offlineDevices) ? prev : current
-    );
-  }, []);
+    )
+  }, [villageData])
 
   const locationWithLeastOfflineDevices = useMemo(() => {
+    if (!villageData.length) return null
     return villageData.reduce((prev, current) => 
       (prev.offlineDevices < current.offlineDevices && current.offlineDevices > 0) ? prev : current
-    );
-  }, []);
+    )
+  }, [villageData])
 
   // Find entities with best and worst data transmission rates
   const regionWithBestDataTransmission = useMemo(() => {
+    if (!regionalComparisonData.length) return null
     return regionalComparisonData.reduce((prev, current) => 
       (prev.dataTransmissionRate > current.dataTransmissionRate) ? prev : current
-    );
-  }, []);
+    )
+  }, [regionalComparisonData])
 
   const regionWithWorstDataTransmission = useMemo(() => {
+    if (!regionalComparisonData.length) return null
     return regionalComparisonData.reduce((prev, current) => 
       (prev.dataTransmissionRate < current.dataTransmissionRate) ? prev : current
-    );
-  }, []);
+    )
+  }, [regionalComparisonData])
 
   // Prepare AQI distribution data for pie chart
   const getAqiDistributionData = (entity) => {
-    if (!entity) return [];
+    if (!entity) return []
     
     return [
       { name: "Good", value: entity.aqiGood || 0, color: aqiColors.good },
@@ -1585,33 +542,59 @@ export default function AnalyticsPage() {
       { name: "Unhealthy", value: entity.aqiUnhealthy || 0, color: aqiColors.unhealthy },
       { name: "V.Unhealthy", value: entity.aqiVeryUnhealthy || 0, color: aqiColors.veryUnhealthy },
       { name: "Hazardous", value: entity.aqiHazardous || 0, color: aqiColors.hazardous },
-    ];
-  };
+    ]
+  }
 
   // Get AQI distribution data for current selections
-  const regionAqiData = getAqiDistributionData(currentRegion);
-  const countryAqiData = getAqiDistributionData(currentCountry);
-  const districtAqiData = getAqiDistributionData(currentDistrict);
-  const locationAqiData = getAqiDistributionData(currentLocation);
+  const regionAqiData = useMemo(() => getAqiDistributionData(currentRegion), [currentRegion])
+  const countryAqiData = useMemo(() => getAqiDistributionData(currentCountry), [currentCountry])
+  const districtAqiData = useMemo(() => getAqiDistributionData(currentDistrict), [currentDistrict])
+  const locationAqiData = useMemo(() => getAqiDistributionData(currentLocation), [currentLocation])
 
   // Filter devices based on search term and status filter
   const filterDevices = (devices) => {
-    if (!devices) return [];
+    if (!devices) return []
     
     return devices.filter((device) => {
       const matchesSearch = 
         device.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        device.name.toLowerCase().includes(searchTerm.toLowerCase());
+        device.name.toLowerCase().includes(searchTerm.toLowerCase())
       
-      const matchesStatus = statusFilter === "all" || device.status === statusFilter;
+      const matchesStatus = statusFilter === "all" || device.status === statusFilter
       
-      return matchesSearch && matchesStatus;
-    });
-  };
+      return matchesSearch && matchesStatus
+    })
+  }
 
-  const filteredCountryDevices = filterDevices(currentCountry.devicesList);
-  const filteredDistrictDevices = filterDevices(currentDistrict.devicesList);
-  const filteredLocationDevices = filterDevices(currentLocation.devicesList);
+  const filteredCountryDevices = useMemo(() => {
+    return currentCountry?.devicesList ? filterDevices(currentCountry.devicesList) : []
+  }, [currentCountry, searchTerm, statusFilter])
+  
+  const filteredDistrictDevices = useMemo(() => {
+    return currentDistrict?.devicesList ? filterDevices(currentDistrict.devicesList) : []
+  }, [currentDistrict, searchTerm, statusFilter])
+  
+  const filteredLocationDevices = useMemo(() => {
+    return currentLocation?.devicesList ? filterDevices(currentLocation.devicesList) : []
+  }, [currentLocation, searchTerm, statusFilter])
+
+  // Handlers for data refresh and export
+  const handleRefresh = () => {
+    // Refetch all data
+    fetchSummaryData()
+    fetchRegionalData()
+    fetchCountryData()
+    fetchDistrictData()
+    fetchVillageData()
+    fetchSitesData()
+    fetchTimeRangeData()
+  }
+
+  const handleExport = () => {
+    // Implement export functionality
+    console.log("Exporting data...")
+    // Example: generate CSV or Excel file
+  }
 
   return (
     <div className="space-y-6">
@@ -1624,10 +607,10 @@ export default function AnalyticsPage() {
             <option value="quarter">Last Quarter</option>
             <option value="year">Last Year</option>
           </select>
-          <Button variant="outline" size="sm" className="flex items-center">
+          <Button variant="outline" size="sm" className="flex items-center" onClick={handleRefresh}>
             <RefreshCw className="mr-2 h-4 w-4" /> Refresh
           </Button>
-          <Button variant="outline" size="sm" className="flex items-center">
+          <Button variant="outline" size="sm" className="flex items-center" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" /> Export
           </Button>
         </div>
@@ -1666,7 +649,7 @@ export default function AnalyticsPage() {
               <CardContent>
                 <div className="text-2xl font-bold">{regionalSummaryData.countries} Countries</div>
                 <p className="text-sm text-muted-foreground">
-                  {regionalSummaryData.countriesDevices} devices across all countries
+                  {regionalSummaryData.totalDevices} devices across all countries
                 </p>
               </CardContent>
             </Card>
@@ -1679,7 +662,7 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {regionalSummaryData.districtsWithDevices}/{regionalSummaryData.districts}
+                  {regionalSummaryData.districts}/{regionalSummaryData.districts}
                 </div>
                 <p className="text-sm text-muted-foreground">Districts with active monitoring devices</p>
               </CardContent>
@@ -1721,11 +704,9 @@ export default function AnalyticsPage() {
         </TabsContent>
 
         <TabsContent value="site" className="space-y-6">
-          
-          <SiteAnalyticsPage/>
-      </TabsContent>
+          <SiteAnalyticsPage />
+        </TabsContent>
       </Tabs>
     </div>
   )
 }
-

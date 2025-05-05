@@ -32,7 +32,9 @@ import {
   Percent,
   Wind,
   Search,
+  ArrowRight,
 } from "lucide-react"
+import Link from "next/link"
 import { config } from "@/lib/config"
 
 // AQI color mapping
@@ -79,81 +81,72 @@ const PaginatedDeviceTable = ({ devices = [], searchTerm = "", statusFilter = "a
   return (
     <>
       <div className="border rounded-md overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-muted/50">
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Device ID</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Last Update</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">PM2.5</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">PM10</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Battery</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Signal</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedDevices.length > 0 ? (
-              paginatedDevices.map((device) => {
-                // Handle both numeric (0/1) and string status values
-                const isOnline = typeof device.status === "number" 
-                  ? device.status === 1 
-                  : device.status === "online";
+      <table className="w-full">
+  <thead>
+    <tr className="bg-muted/50">
+      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Device ID</th>
+      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
+      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
+      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Location</th>
+      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Last Update</th>
+      <th className="text-left py-3 px-4 font-medium text-muted-foreground">PM2.5</th>
+      <th className="text-left py-3 px-4 font-medium text-muted-foreground">PM10</th>
+      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {paginatedDevices.length > 0 ? (
+      paginatedDevices.map((device) => {
+        // Handle both numeric (0/1) and string status values
+        const isOnline = typeof device.status === "number" 
+          ? device.status === 1 
+          : device.status === "online";
 
-                return (
-                  <tr key={device.id} className="border-t hover:bg-muted/30">
-                    <td className="py-3 px-4 font-mono text-sm">{device.id}</td>
-                    <td className="py-3 px-4">{device.name}</td>
-                    <td className="py-3 px-4">
-                      <Badge className={isOnline ? "bg-green-500" : "bg-red-500"}>
-                        {isOnline ? "online" : "offline"}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4">{device.lastUpdate}</td>
-                    <td className="py-3 px-4">{device.pm25} μg/m³</td>
-                    <td className="py-3 px-4">{device.pm10} μg/m³</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${
-                              device.batteryLevel > 70
-                                ? "bg-green-500"
-                                : device.batteryLevel > 30
-                                  ? "bg-yellow-500"
-                                  : "bg-red-500"
-                            }`}
-                            style={{ width: `${device.batteryLevel}%` }}
-                          />
-                        </div>
-                        <span className="text-xs">{device.batteryLevel}%</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className={`w-1 rounded-full ${
-                              i < Math.ceil(device.signalStrength / 25) ? "bg-primary" : "bg-muted"
-                            }`}
-                            style={{ height: `${6 + i * 2}px` }}
-                          />
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
-              <tr>
-                <td colSpan={8} className="py-4 text-center text-muted-foreground">
-                  No devices found matching your criteria
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        return (
+          <tr key={device.id} className="border-t hover:bg-muted/30">
+            <td className="py-3 px-4 font-mono text-sm">{device.id}</td>
+            <td className="py-3 px-4">{device.name || "Unnamed Device"}</td>
+            <td className="py-3 px-4">
+              <Badge className={isOnline ? "bg-green-500" : "bg-red-500"}>
+                {isOnline ? "online" : "offline"}
+              </Badge>
+            </td>
+            <td className="py-3 px-4">
+              <div className="flex flex-col">
+                <span className="font-medium">{device.location?.name || "Unknown"}</span>
+                {device.location?.admin_level_city && (
+                  <span className="text-xs text-gray-500">
+                    {[
+                      device.location.admin_level_city,
+                      device.location.admin_level_country
+                    ].filter(Boolean).join(", ")}
+                  </span>
+                )}
+              </div>
+            </td>
+            <td className="py-3 px-4">{device.lastUpdate}</td>
+            <td className="py-3 px-4">{device.pm25} μg/m³</td>
+            <td className="py-3 px-4">{device.pm10} μg/m³</td>
+            <td className="py-3 px-4">
+              <Link
+                href={`/dashboard/devices/${device.id}`}
+                className="flex items-center text-primary hover:underline"
+              >
+                View Details <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </td>
+          </tr>
+        );
+      })
+    ) : (
+      <tr>
+        <td colSpan={8} className="py-4 text-center text-muted-foreground">
+          No devices found matching your criteria
+        </td>
+      </tr>
+    )}
+  </tbody>
+</table>
       </div>
       
       {filteredDevices.length > 0 && (

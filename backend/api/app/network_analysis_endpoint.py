@@ -164,6 +164,7 @@ def get_country_analysis(db: Session = Depends(get_db)):
 def get_country_analysis_by_name(country: str, db: Session = Depends(get_db)):
     """Get the latest country analysis for a specific country"""
     try:
+        # Get the basic country data first
         query = text("""
             SELECT id, country, data, created_at
             FROM network_analysis_country
@@ -179,6 +180,36 @@ def get_country_analysis_by_name(country: str, db: Session = Depends(get_db)):
             raise HTTPException(status_code=404, detail=f"Country '{country}' not found")
         
         country_dict = dict(country_data._mapping)
+        
+        # If there's a devicesList in the data, enhance it with location information
+        if country_dict.get('data') and 'devicesList' in country_dict['data']:
+            device_keys = [device.get('device_key') for device in country_dict['data']['devicesList'] if device.get('device_key')]
+            
+            if device_keys:
+                # Query to get location information for these devices
+                devices_location_query = text("""
+                    SELECT d.device_key, d.device_id, l.location_name, 
+                           l.village, l.admin_level_city, l.admin_level_country
+                    FROM dim_device d
+                    LEFT JOIN dim_location l ON d.device_key = l.device_key AND l.is_active = true
+                    WHERE d.device_key IN :device_keys
+                """)
+                
+                location_results = db.execute(devices_location_query, {"device_keys": tuple(device_keys)})
+                
+                # Create a mapping of device_key to location info
+                location_map = {}
+                for row in location_results:
+                    loc_dict = dict(row._mapping)
+                    device_key = loc_dict.pop('device_key')
+                    location_map[device_key] = loc_dict
+                
+                # Enhance the devicesList with location information
+                for device in country_dict['data']['devicesList']:
+                    device_key = device.get('device_key')
+                    if device_key and device_key in location_map:
+                        device['location'] = location_map[device_key]
+        
         country_dict = convert_to_json_serializable(country_dict)
         
         return create_json_response(country_dict)
@@ -188,6 +219,7 @@ def get_country_analysis_by_name(country: str, db: Session = Depends(get_db)):
         print(f"Error fetching country analysis for {country}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch country analysis: {str(e)}")
 
+        
 @router.get("/districts")
 def get_district_analysis(country: Optional[str] = None, db: Session = Depends(get_db)):
     """Get the latest district analysis data, optionally filtered by country"""
