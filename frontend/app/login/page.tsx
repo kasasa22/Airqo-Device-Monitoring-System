@@ -1,4 +1,3 @@
-// app/login/page.js (or wherever your login page is located)
 "use client"
 
 import { useState, useEffect, FormEvent } from "react"
@@ -34,19 +33,28 @@ export default function LoginPage() {
     setError("") // Clear any existing errors
 
     try {
+      console.log("Attempting login to:", API_URL);
+      
       // Create form data for FastAPI OAuth2PasswordRequestForm
       const formData = new FormData();
       formData.append('username', email); // FastAPI expects 'username' for email
       formData.append('password', password);
 
       // Make API call to your FastAPI authentication endpoint
-      const response = await fetch("http://localhost:8000/login", {
+      const response = await fetch(`${API_URL}/login`, {
         method: "POST",
         body: formData,
+        // Don't set Content-Type for FormData
+        headers: {
+          'Accept': 'application/json'
+        }
       });
 
+      console.log("Response status:", response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log("Login successful!");
         
         // Save token and user data to localStorage
         localStorage.setItem('access_token', data.access_token);
@@ -57,15 +65,25 @@ export default function LoginPage() {
       } else {
         // Try to get error message from response
         try {
-          const errorData = await response.json();
-          setError(errorData.detail || "Invalid email or password. Please try again.");
+          const errorText = await response.text();
+          let errorMessage = "Invalid email or password. Please try again.";
+          
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.detail || errorMessage;
+          } catch (e) {
+            // If the response isn't valid JSON, use the text directly
+            if (errorText) errorMessage = errorText;
+          }
+          
+          setError(errorMessage);
         } catch (e) {
           setError("Invalid email or password. Please try again.");
         }
       }
     } catch (error) {
       console.error("Login error:", error);
-      setError("An error occurred during login. Please try again.");
+      setError("Connection error. Please make sure the server is running.");
     } finally {
       setIsLoading(false);
     }

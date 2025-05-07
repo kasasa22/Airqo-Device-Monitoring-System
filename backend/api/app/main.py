@@ -1,41 +1,43 @@
-from fastapi import FastAPI, Depends, HTTPException, Response
-from sqlalchemy import create_engine, text, func
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, EmailStr, Field, Extra
-import os
+"""
+Main application module for the AirQo Device Monitoring System.
+"""
+from fastapi import FastAPI, Depends, HTTPException, status, Response, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
-from decimal import Decimal
-
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy import text, func, desc
+from sqlalchemy.orm import Session
+from datetime import timedelta
+from passlib.context import CryptContext
+import logging
 import json
 import math
-import sys
+from decimal import Decimal
+import datetime
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, EmailStr, Field, Extra
+
+from . import database, models, schemas
+from .user_routes import router as user_router
+from .config import CORS_ORIGINS, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, ROLE_DEFAULT_PASSWORDS
+from .superAdmin import create_super_admin
 from app.device_performance_endpoint import router as performance_router, register_with_app
 from app.site_performance_endpoint import router as site_router, register_with_app as register_site_endpoints
 
+# Setup logging
+logging.basicConfig(level=logging.INFO, 
+                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-from datetime import datetime, timedelta
-from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks, Query
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
-from typing import List, Optional
-from passlib.context import CryptContext
-from jose import JWTError, jwt
-import datetime
+# Create FastAPI application
+app = FastAPI(
+    title="AirQo Device Monitoring API",
+    description="API for monitoring AirQo devices and sites",
+    version="2.0.0",
+)
 
-from . import database
-from app.superAdmin import create_super_admin
-from . import models, schemas
-app = FastAPI()
-
-
+# Register device and site routers
 register_with_app(app)
 register_site_endpoints(app)
-
 
 # Custom JSON encoder to handle special values
 class CustomJSONEncoder(json.JSONEncoder):
@@ -46,40 +48,18 @@ class CustomJSONEncoder(json.JSONEncoder):
                 return float(obj)
             except:
                 return str(obj)  # Fallback to string if float conversion fails
-        elif isinstance(obj, datetime):
+        elif isinstance(obj, datetime.datetime):
             return obj.isoformat()
         return super().default(obj)
 
-# Add CORS middleware with updated configuration
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    # Update to include both localhost and your VM hostname
-    allow_origins=[
-        "http://localhost:3000",
-        "http://srv792913.hstgr.cloud:3000",
-        # It's good practice to include HTTPS variants as well
-        "https://srv792913.hstgr.cloud:3000",
-        # You might also want to add a wildcard for all subdomains
-        "http://*.hstgr.cloud:3000"
-    ],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Database connection
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://airflow:airflow@postgres:5432/airflow")
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-# Dependency to get DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 # Helper function to convert values to JSON-serializable format
 def convert_to_json_serializable(item):
@@ -90,7 +70,7 @@ def convert_to_json_serializable(item):
     elif isinstance(item, list):
         return [convert_to_json_serializable(i) for i in item]
     # Handle datetime
-    elif isinstance(item, datetime):
+    elif isinstance(item, datetime.datetime):
         return item.isoformat()
     # Handle Decimal
     elif isinstance(item, Decimal):
@@ -113,8 +93,47 @@ def convert_to_json_serializable(item):
         return item
     # Return any other type as is
     return item
-# Import for arbitrary type handling
-from pydantic import BaseModel, Field, Extra
+
+# Custom response to handle JSON encoding
+def create_json_response(content):
+    """Create a Response with properly encoded JSON content"""
+    json_content = json.dumps(content, cls=CustomJSONEncoder)
+    return Response(content=json_content, media_type="application/json")
+
+# Create database tables on startup
+models.Base.metadata.create_all(bind=database.engine)
+
+# Include user routes
+app.include_router(user_router)
+
+# ============ AUTHENTICATION SECTION =============
+# Password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# OAuth2 setup
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+# Ensure Super Admin exists during app startup
+@app.on_event("startup")
+async def on_startup():
+    create_super_admin()
+
+# Re-export login endpoint to maintain compatibility with existing frontend
+@app.post("/login")
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
+    """Login endpoint that redirects to users.login to maintain existing URL patterns."""
+    from .user_routes import login as users_login
+    return users_login(form_data, db)
+
+@app.get("/")
+async def root():
+    """Health check endpoint"""
+    return {"message": "AirQo Device Health Monitoring API is running"}
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "service": "AirQo Device Monitoring API"}
 
 # Comprehensive Pydantic model matching the API response
 class Device(BaseModel):
@@ -169,15 +188,9 @@ class DeviceCount(BaseModel):
     not_deployed: int
     recalled_devices: int
 
-# Custom response to handle JSON encoding
-def create_json_response(content):
-    """Create a Response with properly encoded JSON content"""
-    json_content = json.dumps(content, cls=CustomJSONEncoder)
-    return Response(content=json_content, media_type="application/json")
-
 # Endpoint to get all devices
 @app.get("/devices")
-def get_all_devices(db=Depends(get_db)):
+def get_all_devices(db=Depends(database.get_db)):
     try:
         # Query to select all fields from the database
         result = db.execute(text("SELECT * FROM dim_device"))
@@ -231,7 +244,7 @@ def get_all_devices(db=Depends(get_db)):
 
 # Endpoint to get a specific device by ID
 @app.get("/devices/{device_id}")
-def get_device(device_id: str, db=Depends(get_db)):
+def get_device(device_id: str, db=Depends(database.get_db)):
     try:
         # Query to select specific device with all fields
         result = db.execute(
@@ -293,7 +306,7 @@ def get_device(device_id: str, db=Depends(get_db)):
 
 # Endpoint to get device counts for dashboard
 @app.get("/device-counts")
-def get_device_counts(db=Depends(get_db)):
+def get_device_counts(db=Depends(database.get_db)):
     try:
         # Get total devices
         total_result = db.execute(text("SELECT COUNT(*) FROM dim_device"))
@@ -342,7 +355,7 @@ def get_device_counts(db=Depends(get_db)):
 
 # Additional endpoint to get device status statistics
 @app.get("/device-status")
-def get_device_status(db=Depends(get_db)):
+def get_device_status(db=Depends(database.get_db)):
     try:
         result = db.execute(text("""
             SELECT 
@@ -370,7 +383,7 @@ def get_device_status(db=Depends(get_db)):
                             status_dict[key] = float(value)
                         except:
                             status_dict[key] = str(value)
-                    elif isinstance(value, datetime):
+                    elif isinstance(value, datetime.datetime):
                         status_dict[key] = value.isoformat()
                 
                 status_counts.append(status_dict)
@@ -383,9 +396,10 @@ def get_device_status(db=Depends(get_db)):
     except Exception as e:
         print(f"Error in device status: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch device status: {str(e)}")
+
 # New endpoint to get device location data for mapping
 @app.get("/device-locations")
-def get_device_locations(db=Depends(get_db)):
+def get_device_locations(db=Depends(database.get_db)):
     try:
         # Use LEFT JOIN instead of JOIN to diagnose possible issues
         result = db.execute(text("""
@@ -441,7 +455,7 @@ def get_device_locations(db=Depends(get_db)):
 
 # New endpoint to get deployment history
 @app.get("/deployment-history")
-def get_deployment_history(days: int = 30, db=Depends(get_db)):
+def get_deployment_history(days: int = 30, db=Depends(database.get_db)):
     try:
         result = db.execute(text("""
             WITH daily_counts AS (
@@ -477,7 +491,7 @@ def get_deployment_history(days: int = 30, db=Depends(get_db)):
 
 # New endpoint to get maintenance metrics
 @app.get("/maintenance-metrics")
-def get_maintenance_metrics(db=Depends(get_db)):
+def get_maintenance_metrics(db=Depends(database.get_db)):
     try:
         # Get devices due for maintenance in the next 7 days
         upcoming_result = db.execute(text("""
@@ -515,14 +529,9 @@ def get_maintenance_metrics(db=Depends(get_db)):
         print(f"Error in maintenance metrics: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch maintenance metrics: {str(e)}")
 
-# Simple endpoint for testing
-@app.get("/")
-def read_root():
-    return {"message": "AirQo Device Health Monitoring API is running"}
-
 # Simple devices endpoint that returns minimal data
 @app.get("/devices-simple")
-def get_devices_simple(db=Depends(get_db)):
+def get_devices_simple(db=Depends(database.get_db)):
     try:
         result = db.execute(text("""
             SELECT 
@@ -544,8 +553,9 @@ def get_devices_simple(db=Depends(get_db)):
     except Exception as e:
         print(f"Error in simple devices endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch simple devices: {str(e)}")
+
 @app.get("/valid-device-locations")
-def get_valid_device_locations(db=Depends(get_db)):
+def get_valid_device_locations(db=Depends(database.get_db)):
     try:
         # Query remains the same
         result = db.execute(text("""
@@ -735,7 +745,7 @@ def get_valid_device_locations(db=Depends(get_db)):
             
         # Create a JSON response, being very careful to handle any unexpected values
         def json_encoder(obj):
-            if isinstance(obj, (datetime, date)):
+            if isinstance(obj, (datetime.datetime, datetime.date)):
                 return obj.isoformat()
             elif isinstance(obj, Decimal):
                 return float(obj)
@@ -750,136 +760,9 @@ def get_valid_device_locations(db=Depends(get_db)):
     except Exception as e:
         print(f"Error in valid-device-locations endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch valid device locations: {str(e)}")
-     
-     
-     
-     
-     
-     # my code that has my routes
-# Create tables if they don't exist
-models.Base.metadata.create_all(bind=database.engine)
-
-# JWT Configuration
-SECRET_KEY = "your-secret-key-change-in-production"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# OAuth2 setup
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
-# Ensure Super Admin exists during app startup
-@app.on_event("startup")
-async def on_startup():
-    create_super_admin()  # No need to pass db since it's created inside the function
-
-# Password verification and hashing functions
-def verify_password(plain_password: str, hashed_password: str):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password: str):
-    return pwd_context.hash(password)
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-# Get current user from the JWT token
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-    
-    user = db.query(models.User).filter(models.User.email == email).first()
-    if user is None:
-        raise credentials_exception
-    return user
-
-# User login route
-@app.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
-    user = db.query(models.User).filter(models.User.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
-    )
-    
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": {
-            "id": user.id,
-            "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "role": user.role,
-            "status": user.status
-        }
-    }
-
-# User management routes (Super Admin can create other users)
-@app.post("/users/", response_model=schemas.User)
-def create_user(
-    user: schemas.UserCreate,
-    db: Session = Depends(database.get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    """Create a new user (Only Super Admin can access this endpoint)"""
-    if current_user.role != "superadmin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only superadmin can create new users"
-        )
-    
-    db_user = db.query(models.User).filter(models.User.email == user.email).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    hashed_password = get_password_hash(user.password)
-    db_user = models.User(
-        email=user.email,
-        password_hash=hashed_password,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        role=user.role,
-        status=user.status,
-        phone=user.phone,
-        location=user.location,
-        created_at=datetime.datetime.utcnow(),
-        updated_at=datetime.datetime.utcnow()
-    )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
-
-    
 
 @app.get("/device-detail/{device_id}")
-def get_device_detail(device_id: str, db=Depends(get_db)):
+def get_device_detail(device_id: str, db=Depends(database.get_db)):
     try:
         # Complex query joining multiple tables to get comprehensive device information
         query = text("""
@@ -1200,7 +1083,7 @@ def get_device_detail(device_id: str, db=Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to fetch device details: {str(e)}")
         
 @app.get("/health-tips/device/{device_id}")
-def get_health_tips_by_device(device_id: str, db=Depends(get_db)):
+def get_health_tips_by_device(device_id: str, db=Depends(database.get_db)):
     try:
         # First get the device_key from the device_id
         device_query = text("""

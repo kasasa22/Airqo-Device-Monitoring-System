@@ -20,10 +20,14 @@
 ---
 x-airflow-common:
   &airflow-common
-  # Replacing the image with a build directive to use our custom Dockerfile
-  build: .
+  build: 
+    context: .
+    dockerfile: Dockerfile
+    args:
+      PIP_DEFAULT_TIMEOUT: 100
   environment:
     &airflow-common-env
+    PIP_DEFAULT_TIMEOUT: 100
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     # For backward compatibility, with Airflow <2.3
@@ -68,6 +72,11 @@ services:
       interval: 5s
       retries: 5
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
   
   pgadmin:
     image: dpage/pgadmin4
@@ -256,9 +265,6 @@ services:
       - -c
       - airflow
 
-  # You can enable flower by adding "--profile flower" option e.g. docker-compose --profile flower up
-  # or by explicitly targeted on the command line e.g. docker-compose up flower.
-  # See: https://docs.docker.com/compose/profiles/
   flower:
     <<: *airflow-common
     command: celery flower
@@ -277,7 +283,6 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
-  # DBT service for data transformations
   dbt:
     image: ghcr.io/dbt-labs/dbt-postgres:1.5.0
     volumes:
@@ -292,32 +297,46 @@ services:
     entrypoint: bash
     command: -c "sleep infinity"
 
-  # FastAPI service for serving data
   fastapi:
-    build: ./backend/api
+    build: 
+      context: ./backend/api
+      dockerfile: Dockerfile
+      args:
+        PIP_DEFAULT_TIMEOUT: 100
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/api:/app  # Updated path to match your project structure
+      - ./backend/api:/app
     environment:
-      - DATABASE_URL=postgresql://airflow:airflow@postgres:5432/airflow
+      DATABASE_URL: postgresql://airflow:airflow@postgres:5432/airflow
+      PIP_DEFAULT_TIMEOUT: 100
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-  # Next.js frontend
+    restart: unless-stopped
+
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     volumes:
       - ./frontend:/app
+      - /app/node_modules
     environment:
-      - API_URL=http://fastapi:8000
+      # Updated this environment variable name to match what React expects
+      NEXT_PUBLIC_API_URL: http://fastapi:8000
     depends_on:
       - fastapi
-  
     command: npm run dev
-    
+    restart: unless-stopped
     
 volumes:
   postgres-db-volume:

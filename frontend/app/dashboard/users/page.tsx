@@ -38,11 +38,14 @@ interface User {
 }
 
 const userRoles = [
-  { value: "administrator", label: "Administrator" },
-  { value: "data_analyst", label: "Data Analyst" },
-  { value: "field_technician", label: "Field Technician" },
-  { value: "viewer", label: "Viewer" },
+  { value: "administrator", label: "Administrator", description: "Full access to all system features" },
+  //{ value: "data_analyst", label: "Data Analyst", description: "Can view and analyze data, generate reports" },
+  //{ value: "field_technician", label: "Field Technician", description: "Manages devices and field operations" },
+  //{ value: "researcher", label: "Researcher", description: "Access to data for research purposes" },
+  { value: "system_operator", label: "System Operator", description: "data analysis, device management, research overview" },
+  { value: "viewer", label: "Viewer", description: "Read-only access to dashboards and reports" },
 ]
+
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
@@ -305,14 +308,16 @@ export default function UsersPage() {
                         <Label>First Name</Label>
                         <Input 
                           value={newUser.first_name}
-                          onChange={(e) => setNewUser({...newUser, first_name: e.target.value})}
+                          onChange={(e) => setNewUser({ ...newUser, first_name: e.target.value })}
+                          placeholder="first name"
                         />
                       </div>
                       <div className="space-y-2">
                         <Label>Last Name</Label>
                         <Input 
                           value={newUser.last_name}
-                          onChange={(e) => setNewUser({...newUser, last_name: e.target.value})}
+                          onChange={(e) => setNewUser({ ...newUser, last_name: e.target.value })}
+                          placeholder="last name"
                         />
                       </div>
                     </div>
@@ -322,7 +327,8 @@ export default function UsersPage() {
                       <Input 
                         type="email"
                         value={newUser.email}
-                        onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                        onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                        placeholder="email"
                       />
                     </div>
 
@@ -332,18 +338,18 @@ export default function UsersPage() {
                         type="tel"
                         value={newUser.phone}
                         onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
-                        placeholder="Optional"
+                        placeholder="phone number"
                       />
                     </div>
                     
-                    <div className="space-y-2">
-                      <Label>Password</Label>
+                    {/*< div className="space-y-2">
+                      <Label>*Password</Label>
                       <Input 
                         type="password"
                         value={newUser.password}
                         onChange={(e) => setNewUser({...newUser, password: e.target.value})}
                       />
-                    </div>
+                    </div>*/}
                     
                     <div className="space-y-2">
                       <Label>Role</Label>
@@ -362,6 +368,15 @@ export default function UsersPage() {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Location</Label>
+                      <Input 
+                        type="text"
+                        value={newUser.location}
+                        onChange={(e) => setNewUser({...newUser, location: e.target.value})}
+                        placeholder="location"
+                      />
                     </div>
                   </div>
                   
