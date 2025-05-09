@@ -557,52 +557,7 @@ export default function SiteAnalyticsPage() {
     </CardContent>
   </Card>
 
-  <Card>
-    <CardHeader>
-      <CardTitle className="flex items-center">
-        <MapPin className="mr-2 h-5 w-5 text-primary" />
-        Top Sites by Data Completeness
-      </CardTitle>
-      <CardDescription>Sites with the highest data completeness percentage</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <div className="h-80">
-        {locationData.sites && locationData.sites.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart 
-              data={locationData.sites
-                .filter(site => site.data_completeness !== undefined && site.data_completeness !== null)
-                .sort((a, b) => (b.data_completeness || 0) - (a.data_completeness || 0))
-                .slice(0, 10)
-              }
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="site_name" 
-                tick={{ fontSize: 12 }}
-                interval={0}
-                tickFormatter={(value) => value && value.length > 10 ? `${value.substring(0, 10)}...` : value}
-              />
-              <YAxis domain={[0, 100]} />
-              <Tooltip />
-              <Legend />
-              <Bar 
-                dataKey="data_completeness" 
-                name="Data Completeness (%)" 
-                fill="#82ca9d" 
-                radius={[4, 4, 0, 0]}
-                label={{ position: 'top', formatter: (value) => `${Math.round(value)}%`, fontSize: 12 }}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">No site data available</p>
-          </div>
-        )}
-      </div>
-    </CardContent>
-  </Card>
+ 
 </TabsContent>
 
 <TabsContent value="air-quality" className="space-y-4">

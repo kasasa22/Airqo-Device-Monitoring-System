@@ -18,6 +18,7 @@ import sys
 from app.device_performance_endpoint import router as performance_router, register_with_app
 from app.site_performance_endpoint import router as site_router, register_with_app as register_site_endpoints
 from app.data_transmission_endpoint import router as data_transmission_router, register_with_app as register_data_analytics
+from app.network_analysis_endpoint import router as network_router, register_with_app as register_network_analysis
 
 
 from datetime import datetime, timedelta
@@ -40,6 +41,7 @@ app = FastAPI()
 register_with_app(app)
 register_site_endpoints(app)
 register_data_analytics(app)
+register_network_analysis(app)
 
 
 # Custom JSON encoder to handle special values
@@ -290,7 +292,7 @@ def get_device(device_id: str, db=Depends(get_db)):
             device_dict['site'] = site
         
         return create_json_response(device_dict)
-    except HTTPException:
+    # except HTTPException:
         raise
     except Exception as e:
         print(f"Error in get_device: {str(e)}")
@@ -1427,3 +1429,446 @@ def get_default_health_tips(aqi_category):
             "description": "Consider wearing an N95 mask when outdoors if air quality is poor."
         }
     ]
+
+
+@app.get("/devices-detail")
+def get_all_devices_detail(db=Depends(get_db)):
+    try:
+        # Complex query joining multiple tables to get comprehensive device information
+        # Same as the device-detail endpoint but without the device_id filter
+        # Added condition to only show deployed devices (is_active = true)
+        query = text("""
+            WITH latest_readings AS (
+                SELECT DISTINCT ON (device_key) 
+                    device_key,
+                    site_key,
+                    timestamp,
+                    pm2_5,
+                    pm10,
+                    no2,
+                    aqi_category,
+                    aqi_color,
+                    aqi_color_name
+                FROM fact_device_readings
+                ORDER BY device_key, timestamp DESC
+            ),
+            latest_status AS (
+                SELECT DISTINCT ON (device_key)
+                    device_key,
+                    timestamp,
+                    is_online,
+                    device_status
+                FROM fact_device_status
+                ORDER BY device_key, timestamp DESC
+            )
+            SELECT 
+                -- Device basic information
+                d.device_key,
+                d.device_id,
+                d.device_name,
+                d.network,
+                d.category,
+                d.is_active,
+                d.status,
+                d.mount_type,
+                d.power_type,
+                d.height,
+                d.next_maintenance,
+                d.first_seen,
+                d.last_updated,
+                
+                -- Location information
+                l.location_key,
+                l.latitude,
+                l.longitude,
+                l.location_name,
+                l.search_name,
+                l.village,
+                l.admin_level_country,
+                l.admin_level_city,
+                l.admin_level_division,
+                l.site_category,
+                l.site_id,
+                l.site_name,
+                l.deployment_date,
+                
+                -- Latest readings
+                r.pm2_5,
+                r.pm10,
+                r.no2,
+                r.timestamp as reading_timestamp,
+                r.aqi_category,
+                r.aqi_color,
+                r.aqi_color_name,
+                
+                -- Latest status
+                st.is_online as current_is_online,
+                st.device_status as current_device_status,
+                st.timestamp as status_timestamp,
+                
+                -- Site information
+                s.site_name as full_site_name,
+                s.location_name as full_location_name,
+                s.search_name as full_search_name,
+                s.village as full_village,
+                s.town,
+                s.city,
+                s.district,
+                s.country,
+                s.data_provider,
+                s.site_category as full_site_category
+                
+            FROM dim_device d
+            LEFT JOIN dim_location l ON d.device_key = l.device_key AND l.is_active = true
+            LEFT JOIN latest_readings r ON d.device_key = r.device_key
+            LEFT JOIN latest_status st ON d.device_key = st.device_key
+            LEFT JOIN dim_site s ON r.site_key = s.site_key
+            WHERE d.is_active = true  -- Only show deployed devices
+        """)
+        
+        result = db.execute(query)
+        
+        # Get the EAT timezone
+        eat_timezone = tz.gettz('Africa/Kampala')
+        
+        # Function to convert timestamps to EAT
+        def convert_to_eat(timestamp):
+            if timestamp is None:
+                return None
+                
+            # If timestamp has no timezone info, assume it's UTC
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
+                
+            # Convert to EAT timezone
+            eat_time = timestamp.astimezone(eat_timezone)
+            return eat_time.isoformat()
+        
+        # Process results
+        all_devices = []
+        
+        for device_row in result:
+            # Convert row to dictionary with timezone conversion
+            raw_device_dict = {}
+            for column, value in device_row._mapping.items():
+                raw_device_dict[column] = value
+                
+            # Process data with timezone conversion
+            device_dict = {}
+            for key, value in raw_device_dict.items():
+                if value is None:
+                    device_dict[key] = None
+                    continue
+                    
+                # Handle different types
+                try:
+                    # Try to convert to float
+                    float_val = float(value)
+                    if float_val != float_val:  # NaN check
+                        device_dict[key] = None
+                    else:
+                        device_dict[key] = float_val
+                except (TypeError, ValueError):
+                    # If conversion to float fails, check for datetime
+                    try:
+                        if hasattr(value, 'isoformat'):
+                            # Convert datetime to EAT
+                            device_dict[key] = convert_to_eat(value)
+                        else:
+                            device_dict[key] = str(value)
+                    except:
+                        device_dict[key] = str(value)
+            
+            # Get maintenance history for this device without limit
+            maintenance_history_query = text("""
+                WITH maintenance_entries AS (
+                    SELECT 
+                        timestamp,
+                        CASE 
+                            WHEN LAG(is_online) OVER (ORDER BY timestamp) = false AND is_online = true THEN 'Restored'
+                            WHEN LAG(is_online) OVER (ORDER BY timestamp) = true AND is_online = false THEN 'Offline'
+                            WHEN LAG(device_status) OVER (ORDER BY timestamp) != device_status THEN 'Status Change'
+                            ELSE null
+                        END as maintenance_type,
+                        CASE 
+                            WHEN LAG(is_online) OVER (ORDER BY timestamp) = false AND is_online = true THEN 'Device came back online'
+                            WHEN LAG(is_online) OVER (ORDER BY timestamp) = true AND is_online = false THEN 'Device went offline'
+                            WHEN LAG(device_status) OVER (ORDER BY timestamp) != device_status THEN 'Status changed to ' || device_status
+                            ELSE null
+                        END as description
+                    FROM fact_device_status
+                    WHERE device_key = :device_key
+                    ORDER BY timestamp DESC
+                )
+                SELECT 
+                    timestamp,
+                    maintenance_type,
+                    description
+                FROM maintenance_entries
+                WHERE maintenance_type IS NOT NULL
+            """)
+            
+            history_result = db.execute(maintenance_history_query, {"device_key": raw_device_dict.get('device_key')})
+            maintenance_history = []
+            
+            for row in history_result:
+                raw_history_dict = {}
+                for column, value in row._mapping.items():
+                    raw_history_dict[column] = value
+                    
+                history_dict = {}
+                for key, value in raw_history_dict.items():
+                    if value is None:
+                        history_dict[key] = None
+                        continue
+                        
+                    try:
+                        float_val = float(value)
+                        if float_val != float_val:
+                            history_dict[key] = None
+                        else:
+                            history_dict[key] = float_val
+                    except (TypeError, ValueError):
+                        try:
+                            if hasattr(value, 'isoformat'):
+                                # Convert datetime to EAT
+                                history_dict[key] = convert_to_eat(value)
+                            else:
+                                history_dict[key] = str(value)
+                        except:
+                            history_dict[key] = str(value)
+                            
+                maintenance_history.append(history_dict)
+            
+            # Get readings history for this device without limit
+            readings_history_query = text("""
+                SELECT 
+                    timestamp,
+                    pm2_5,
+                    pm10,
+                    no2,
+                    aqi_category
+                FROM fact_device_readings
+                WHERE device_key = :device_key
+                ORDER BY timestamp DESC
+            """)
+            
+            readings_result = db.execute(readings_history_query, {"device_key": raw_device_dict.get('device_key')})
+            readings_history = []
+            
+            for row in readings_result:
+                raw_reading_dict = {}
+                for column, value in row._mapping.items():
+                    raw_reading_dict[column] = value
+                    
+                reading_dict = {}
+                for key, value in raw_reading_dict.items():
+                    if value is None:
+                        reading_dict[key] = None
+                        continue
+                        
+                    try:
+                        float_val = float(value)
+                        if float_val != float_val:
+                            reading_dict[key] = None
+                        else:
+                            reading_dict[key] = float_val
+                    except (TypeError, ValueError):
+                        try:
+                            if hasattr(value, 'isoformat'):
+                                # Convert datetime to EAT
+                                reading_dict[key] = convert_to_eat(value)
+                            else:
+                                reading_dict[key] = str(value)
+                        except:
+                            reading_dict[key] = str(value)
+                            
+                readings_history.append(reading_dict)
+            
+            # Structure the response with null checks
+            device_response = {
+                "device": {
+                    "id": str(device_dict.get("device_id", "")) if device_dict.get("device_id") is not None else None,
+                    "name": str(device_dict.get("device_name", "")) if device_dict.get("device_name") is not None else None,
+                    "status": str(device_dict.get("status", "")) if device_dict.get("status") is not None else None,
+                    "is_online": device_dict.get("current_is_online"),
+                    "network": str(device_dict.get("network", "")) if device_dict.get("network") is not None else None,
+                    "category": str(device_dict.get("category", "")) if device_dict.get("category") is not None else None,
+                    "is_active": device_dict.get("is_active"),
+                    "mount_type": str(device_dict.get("mount_type", "")) if device_dict.get("mount_type") is not None else None,
+                    "power_type": str(device_dict.get("power_type", "")) if device_dict.get("power_type") is not None else None,
+                    "height": device_dict.get("height"),
+                    "next_maintenance": device_dict.get("next_maintenance"),
+                    "first_seen": device_dict.get("first_seen"),
+                    "last_updated": device_dict.get("last_updated")
+                },
+                "location": {
+                    "latitude": device_dict.get("latitude"),
+                    "longitude": device_dict.get("longitude"),
+                    "name": str(device_dict.get("location_name", "")) if device_dict.get("location_name") is not None else 
+                            (str(device_dict.get("full_location_name", "")) if device_dict.get("full_location_name") is not None else None),
+                    "country": str(device_dict.get("admin_level_country", "")) if device_dict.get("admin_level_country") is not None else 
+                            (str(device_dict.get("country", "")) if device_dict.get("country") is not None else None),
+                    "city": str(device_dict.get("admin_level_city", "")) if device_dict.get("admin_level_city") is not None else 
+                            (str(device_dict.get("city", "")) if device_dict.get("city") is not None else None),
+                    "division": str(device_dict.get("admin_level_division", "")) if device_dict.get("admin_level_division") is not None else None,
+                    "village": str(device_dict.get("village", "")) if device_dict.get("village") is not None else 
+                            (str(device_dict.get("full_village", "")) if device_dict.get("full_village") is not None else None),
+                    "deployment_date": device_dict.get("deployment_date")
+                },
+                "site": {
+                    "id": str(device_dict.get("site_id", "")) if device_dict.get("site_id") is not None else None,
+                    "name": str(device_dict.get("site_name", "")) if device_dict.get("site_name") is not None else 
+                            (str(device_dict.get("full_site_name", "")) if device_dict.get("full_site_name") is not None else None),
+                    "category": str(device_dict.get("site_category", "")) if device_dict.get("site_category") is not None else 
+                                (str(device_dict.get("full_site_category", "")) if device_dict.get("full_site_category") is not None else None),
+                    "data_provider": str(device_dict.get("data_provider", "")) if device_dict.get("data_provider") is not None else None
+                },
+                "latest_reading": {
+                    "timestamp": device_dict.get("reading_timestamp"),
+                    "pm2_5": device_dict.get("pm2_5"),
+                    "pm10": device_dict.get("pm10"),
+                    "no2": device_dict.get("no2"),
+                    "aqi_category": str(device_dict.get("aqi_category", "")) if device_dict.get("aqi_category") is not None else None,
+                    "aqi_color": str(device_dict.get("aqi_color", "")) if device_dict.get("aqi_color") is not None else None
+                },
+                "maintenance_history": maintenance_history,
+                "readings_history": readings_history,
+            }
+            
+            all_devices.append(device_response)
+        
+        # Custom JSON encoder for any remaining datetime objects
+        def safe_json_encoder(obj):
+            try:
+                json.dumps(obj)
+                return obj
+            except:
+                try:
+                    if hasattr(obj, 'isoformat'):
+                        # Convert datetime to EAT
+                        return convert_to_eat(obj)
+                    return str(obj)
+                except:
+                    return None
+        
+        # Create response object
+        response = {
+            "devices": all_devices,
+            "count": len(all_devices),
+            "timezone": "Africa/Kampala (EAT)"
+        }
+        
+        # Convert to JSON with custom encoder
+        json_str = json.dumps(response, default=safe_json_encoder)
+        safe_response = json.loads(json_str)
+        
+        return safe_response
+        
+    except Exception as e:
+        print(f"Error in get_all_devices_detail: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch all device details: {str(e)}")
+
+
+@app.get("/device-monitoring-metrics")
+def get_device_monitoring_metrics(db=Depends(get_db)):
+    try:
+        # Query to get region and country summary metrics
+        region_country_query = text("""
+            WITH region_counts AS (
+                SELECT 
+                    admin_level_country as country_name,
+                    COUNT(DISTINCT l.device_key) as device_count,
+                    COUNT(DISTINCT admin_level_division) as district_count,
+                    SUM(CASE WHEN d.is_active = true THEN 1 ELSE 0 END) as active_devices,
+                    -- Group countries into regions
+                    CASE
+                        WHEN admin_level_country IN ('Uganda', 'Kenya', 'Tanzania', 'Rwanda', 'Burundi', 'South Sudan') THEN 'East Africa'
+                        WHEN admin_level_country IN ('Nigeria', 'Ghana', 'Senegal', 'Ivory Coast', 'Cameroon') THEN 'West Africa'
+                        WHEN admin_level_country IN ('South Africa', 'Botswana', 'Zimbabwe', 'Zambia', 'Mozambique') THEN 'Southern Africa'
+                        WHEN admin_level_country IN ('Egypt', 'Morocco', 'Tunisia', 'Algeria', 'Libya') THEN 'North Africa'
+                        WHEN admin_level_country IN ('DR Congo', 'Chad', 'Central African Republic', 'Gabon') THEN 'Central Africa'
+                        ELSE 'Other'
+                    END as region
+                FROM dim_location l
+                JOIN dim_device d ON l.device_key = d.device_key
+                WHERE l.is_active = true AND admin_level_country IS NOT NULL
+                GROUP BY admin_level_country
+            ),
+            region_summary AS (
+                SELECT 
+                    region,
+                    COUNT(DISTINCT country_name) as country_count,
+                    SUM(device_count) as total_devices,
+                    SUM(district_count) as total_districts
+                FROM region_counts
+                GROUP BY region
+            )
+            SELECT 
+                COUNT(DISTINCT region) as total_regions,
+                SUM(total_devices) as total_devices,
+                SUM(country_count) as total_countries,
+                SUM(total_districts) as total_districts
+            FROM region_summary
+        """)
+        
+        region_country_result = db.execute(region_country_query).fetchone()
+        
+        # Query to get device status metrics
+        device_status_query = text("""
+            WITH latest_device_status AS (
+                SELECT DISTINCT ON (s.device_key)
+                    s.device_key,
+                    s.is_online,
+                    s.device_status
+                FROM fact_device_status s
+                JOIN dim_device d ON s.device_key = d.device_key
+                WHERE d.is_active = true
+                ORDER BY s.device_key, s.timestamp DESC
+            )
+            SELECT
+                COUNT(*) as total_active_devices,
+                SUM(CASE WHEN is_online = true THEN 1 ELSE 0 END) as online_devices,
+                SUM(CASE WHEN is_online = false THEN 1 ELSE 0 END) as offline_devices
+            FROM latest_device_status
+        """)
+        
+        device_status_result = db.execute(device_status_query).fetchone()
+        
+        # Query to get district metrics
+        district_query = text("""
+            SELECT
+                COUNT(DISTINCT CASE WHEN admin_level_division IS NOT NULL THEN admin_level_division END) as total_districts,
+                COUNT(DISTINCT CASE WHEN d.is_active = true AND admin_level_division IS NOT NULL THEN admin_level_division END) as districts_with_devices
+            FROM dim_location l
+            JOIN dim_device d ON l.device_key = d.device_key
+        """)
+        
+        district_result = db.execute(district_query).fetchone()
+        
+        # Format the response
+        response = {
+            "regions": {
+                "count": region_country_result.total_regions if region_country_result else 0,
+                "devices": region_country_result.total_devices if region_country_result else 0
+            },
+            "countries": {
+                "count": region_country_result.total_countries if region_country_result else 0,
+                "devices": region_country_result.total_devices if region_country_result else 0
+            },
+            "districts": {
+                "total": district_result.total_districts if district_result else 0,
+                "with_devices": district_result.districts_with_devices if district_result else 0
+            },
+            "devices": {
+                "total": device_status_result.total_active_devices if device_status_result else 0,
+                "online": device_status_result.online_devices if device_status_result else 0,
+                "offline": device_status_result.offline_devices if device_status_result else 0
+            }
+        }
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error in get_device_monitoring_metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch device monitoring metrics: {str(e)}")
