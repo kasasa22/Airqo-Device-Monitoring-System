@@ -67,7 +67,13 @@ app.add_middleware(
         # It's good practice to include HTTPS variants as well
         "https://srv792913.hstgr.cloud:3000",
         # You might also want to add a wildcard for all subdomains
-        "http://*.hstgr.cloud:3000"
+        "http://*.hstgr.cloud:3000",
+        "http://srv828289.hstgr.cloud:3000",
+        "https://srv828289.hstgr.cloud:3000",
+        "http://srv828289.hstgr.cloud:8000",
+        "http://frontend:3000",
+        "http://172.18.0.6:3000",
+
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -760,6 +766,10 @@ def get_valid_device_locations(db=Depends(get_db)):
      
      
      
+
+
+
+ 
      
      
      # my code that has my routes
