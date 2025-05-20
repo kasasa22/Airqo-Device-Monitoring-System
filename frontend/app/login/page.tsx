@@ -31,7 +31,7 @@ export default function LoginPage() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
     setIsLoading(true)
-    setError("") // Clear any existing errors
+    setError("") 
 
     try {
       // Create form data for FastAPI OAuth2PasswordRequestForm
@@ -40,7 +40,7 @@ export default function LoginPage() {
       formData.append('password', password);
 
       // Make API call to your FastAPI authentication endpoint
-      const response = await fetch(`http://srv792913.hstgr.cloud:8000/login`, {
+      const response = await fetch(`http://srv828289.hstgr.cloud:8000/login`, {
         method: "POST",
         body: formData,
       });
