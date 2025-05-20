@@ -17,17 +17,30 @@ const nextConfig = {
     unoptimized: true,
   },
   experimental: {
+    // Remove allowedDevOrigins from here
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
   },
+  // Add this section for CORS headers if needed
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Credentials', value: 'true' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET,OPTIONS,PATCH,DELETE,POST,PUT' },
+          { key: 'Access-Control-Allow-Headers', value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version' },
+        ],
+      },
+    ]
+  },
 }
-
-mergeConfig(nextConfig, userConfig)
 
 function mergeConfig(nextConfig, userConfig) {
   if (!userConfig) {
-    return
+    return nextConfig
   }
 
   for (const key in userConfig) {
@@ -43,6 +56,9 @@ function mergeConfig(nextConfig, userConfig) {
       nextConfig[key] = userConfig[key]
     }
   }
+  
+  return nextConfig
 }
 
-export default nextConfig
+const finalConfig = mergeConfig(nextConfig, userConfig)
+export default finalConfig
