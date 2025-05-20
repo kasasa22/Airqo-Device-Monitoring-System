@@ -87,8 +87,6 @@ const PaginatedDeviceTable = ({ devices = [], searchTerm = "", statusFilter = "a
       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Device ID</th>
       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
-      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Location</th>
-      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Last Update</th>
       <th className="text-left py-3 px-4 font-medium text-muted-foreground">PM2.5</th>
       <th className="text-left py-3 px-4 font-medium text-muted-foreground">PM10</th>
       <th className="text-left py-3 px-4 font-medium text-muted-foreground">Actions</th>
@@ -111,20 +109,7 @@ const PaginatedDeviceTable = ({ devices = [], searchTerm = "", statusFilter = "a
                 {isOnline ? "online" : "offline"}
               </Badge>
             </td>
-            <td className="py-3 px-4">
-              <div className="flex flex-col">
-                <span className="font-medium">{device.location?.name || "Unknown"}</span>
-                {device.location?.admin_level_city && (
-                  <span className="text-xs text-gray-500">
-                    {[
-                      device.location.admin_level_city,
-                      device.location.admin_level_country
-                    ].filter(Boolean).join(", ")}
-                  </span>
-                )}
-              </div>
-            </td>
-            <td className="py-3 px-4">{device.lastUpdate}</td>
+        
             <td className="py-3 px-4">{device.pm25} μg/m³</td>
             <td className="py-3 px-4">{device.pm10} μg/m³</td>
             <td className="py-3 px-4">
@@ -140,7 +125,7 @@ const PaginatedDeviceTable = ({ devices = [], searchTerm = "", statusFilter = "a
       })
     ) : (
       <tr>
-        <td colSpan={8} className="py-4 text-center text-muted-foreground">
+        <td colSpan={7} className="py-4 text-center text-muted-foreground">
           No devices found matching your criteria
         </td>
       </tr>
@@ -249,6 +234,11 @@ export default function CountryAnalysis({ timeRange }) {
   const [districtsInCountry, setDistrictsInCountry] = useState([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [pm25TimeSeriesData, setPm25TimeSeriesData] = useState([]);
+
+
+
+  
 
   // Fetch all regions on component mount
   useEffect(() => {
@@ -342,6 +332,46 @@ export default function CountryAnalysis({ timeRange }) {
     fetchCountryData()
   }, [selectedCountry])
 
+
+  // 1. Add this useEffect to fetch country time series data when selectedCountry changes
+useEffect(() => {
+  if (!selectedCountry) return;
+
+  const fetchCountryTimeSeriesData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${config.apiUrl}/network-analysis/countries/${encodeURIComponent(selectedCountry)}/time-series?days=14`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setPm25TimeSeriesData(data.timeSeriesData || []);
+    } catch (err) {
+      console.error(`Failed to fetch time series data for country ${selectedCountry}:`, err);
+      // Fallback to sample data if API call fails
+      setPm25TimeSeriesData([
+        { date: "4/18/2025", pm25: 9, pm10: 3 },
+        { date: "4/19/2025", pm25: 26, pm10: 36 },
+        { date: "4/20/2025", pm25: 17, pm10: 22 },
+        { date: "4/21/2025", pm25: 19, pm10: 25 },
+        { date: "4/22/2025", pm25: 22, pm10: 31 },
+        { date: "4/23/2025", pm25: 17, pm10: 16 },
+        { date: "4/24/2025", pm25: 18, pm10: 21 },
+        { date: "4/25/2025", pm25: 16, pm10: 18 },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchCountryTimeSeriesData();
+}, [selectedCountry]);
+
+
+
+
+
   // Fetch districts in selected country
   const fetchDistrictsInCountry = async (country) => {
     try {
@@ -362,32 +392,38 @@ export default function CountryAnalysis({ timeRange }) {
     }
   }
 
-  // Handle refresh
-  const handleRefresh = () => {
-    if (selectedCountry) {
-      // Re-fetch the current country data
-      const fetchCountryData = async () => {
-        try {
-          setLoading(true)
-          const response = await fetch(`${config.apiUrl}/network-analysis/countries/${encodeURIComponent(selectedCountry)}`)
-          if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`)
-          }
-          
-          const countryData = await response.json()
-          setCurrentCountry(countryData)
-          await fetchDistrictsInCountry(selectedCountry)
-        } catch (err) {
-          console.error(`Failed to refresh data for country ${selectedCountry}:`, err)
-          setError(`Failed to refresh data for ${selectedCountry}. Please try again later.`)
-        } finally {
-          setLoading(false)
+ const handleRefresh = () => {
+  if (selectedCountry) {
+    // Re-fetch the current country data
+    const fetchCountryData = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${config.apiUrl}/network-analysis/countries/${encodeURIComponent(selectedCountry)}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
         }
+        
+        const countryData = await response.json();
+        setCurrentCountry(countryData);
+        await fetchDistrictsInCountry(selectedCountry);
+        
+        // Also refresh time series data
+        const timeSeriesResponse = await fetch(`${config.apiUrl}/network-analysis/countries/${encodeURIComponent(selectedCountry)}/time-series?days=14`);
+        if (timeSeriesResponse.ok) {
+          const timeSeriesData = await timeSeriesResponse.json();
+          setPm25TimeSeriesData(timeSeriesData.timeSeriesData || []);
+        }
+      } catch (err) {
+        console.error(`Failed to refresh data for country ${selectedCountry}:`, err);
+        setError(`Failed to refresh data for ${selectedCountry}. Please try again later.`);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      fetchCountryData()
-    }
+    fetchCountryData();
   }
+};
 
   // Prepare AQI distribution data for pie chart
   const getAqiDistributionData = () => {
@@ -454,17 +490,7 @@ export default function CountryAnalysis({ timeRange }) {
   const districtChartData = getDistrictChartData()
   const devicesList = getDevicesList()
 
-  // Sample PM2.5 time series data for comparison charts (replace with actual data from API)
-  const pm25TimeSeriesData = [
-    { date: "4/18/2025", pm25: 9, pm10: 3 },
-    { date: "4/19/2025", pm25: 26, pm10: 36 },
-    { date: "4/20/2025", pm25: 17, pm10: 22 },
-    { date: "4/21/2025", pm25: 19, pm10: 25 },
-    { date: "4/22/2025", pm25: 22, pm10: 31 },
-    { date: "4/23/2025", pm25: 17, pm10: 16 },
-    { date: "4/24/2025", pm25: 18, pm10: 21 },
-    { date: "4/25/2025", pm25: 16, pm10: 18 },
-  ]
+
 
   return (
     <div className="space-y-4">
@@ -671,16 +697,21 @@ export default function CountryAnalysis({ timeRange }) {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Wind className="mr-2 h-5 w-5 text-primary" />
-              PM10 vs PM2.5 Comparison
-            </CardTitle>
-            <CardDescription>Comparison of PM10 and PM2.5 levels over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Wind className="mr-2 h-5 w-5 text-primary" />
+            PM10 vs PM2.5 Comparison
+          </CardTitle>
+          <CardDescription>Comparison of PM10 and PM2.5 levels over time in {selectedCountry}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-80">
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">Loading trend data...</p>
+              </div>
+            ) : pm25TimeSeriesData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={pm25TimeSeriesData}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -692,9 +723,14 @@ export default function CountryAnalysis({ timeRange }) {
                   <Line type="monotone" dataKey="pm10" name="PM10 (μg/m³)" stroke="#82ca9d" />
                 </LineChart>
               </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">No data available for this country</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
       </div>
 
       {/* Device List for Country with Pagination */}
