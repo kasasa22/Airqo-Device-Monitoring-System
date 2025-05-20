@@ -23,6 +23,7 @@ import {
   Pie,
   Cell,
 } from "recharts"
+import Link from "next/link"
 import {
   Download,
   RefreshCw,
@@ -32,6 +33,8 @@ import {
   Percent,
   Wind,
   Search,
+  ArrowRight,
+  ArrowLeft,
 } from "lucide-react"
 import { config } from "@/lib/config"
 
@@ -80,79 +83,54 @@ const PaginatedDeviceTable = ({ devices = [], searchTerm = "", statusFilter = "a
     <>
       <div className="border rounded-md overflow-hidden">
         <table className="w-full">
-          <thead>
-            <tr className="bg-muted/50">
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Device ID</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Last Update</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">PM2.5</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">PM10</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Battery</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Signal</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedDevices.length > 0 ? (
-              paginatedDevices.map((device) => {
-                // Handle both numeric (0/1) and string status values
-                const isOnline = typeof device.status === "number" 
-                  ? device.status === 1 
-                  : device.status === "online";
-
-                return (
-                  <tr key={device.id} className="border-t hover:bg-muted/30">
-                    <td className="py-3 px-4 font-mono text-sm">{device.id}</td>
-                    <td className="py-3 px-4">{device.name}</td>
-                    <td className="py-3 px-4">
-                      <Badge className={isOnline ? "bg-green-500" : "bg-red-500"}>
-                        {isOnline ? "online" : "offline"}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4">{device.lastUpdate}</td>
-                    <td className="py-3 px-4">{device.pm25} μg/m³</td>
-                    <td className="py-3 px-4">{device.pm10} μg/m³</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${
-                              device.batteryLevel > 70
-                                ? "bg-green-500"
-                                : device.batteryLevel > 30
-                                  ? "bg-yellow-500"
-                                  : "bg-red-500"
-                            }`}
-                            style={{ width: `${device.batteryLevel}%` }}
-                          />
-                        </div>
-                        <span className="text-xs">{device.batteryLevel}%</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className={`w-1 rounded-full ${
-                              i < Math.ceil(device.signalStrength / 25) ? "bg-primary" : "bg-muted"
-                            }`}
-                            style={{ height: `${6 + i * 2}px` }}
-                          />
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
-              <tr>
-                <td colSpan={8} className="py-4 text-center text-muted-foreground">
-                  No devices found matching your criteria
-                </td>
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Device ID</th>
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground">PM2.5</th>
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground">PM10</th>
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Actions</th>
               </tr>
-            )}
-          </tbody>
+            </thead>
+            <tbody>
+              {paginatedDevices.length > 0 ? (
+                paginatedDevices.map((device) => {
+                  // Handle both numeric (0/1) and string status values
+                  const isOnline = typeof device.status === "number" 
+                    ? device.status === 1 
+                    : device.status === "online";
+
+                  return (
+                    <tr key={device.id} className="border-t hover:bg-muted/30">
+                      <td className="py-3 px-4 font-mono text-sm">{device.id}</td>
+                      <td className="py-3 px-4">{device.name || "Unnamed Device"}</td>
+                      <td className="py-3 px-4">
+                        <Badge className={isOnline ? "bg-green-500" : "bg-red-500"}>
+                          {isOnline ? "online" : "offline"}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4">{device.pm25} μg/m³</td>
+                      <td className="py-3 px-4">{device.pm10} μg/m³</td>
+                      <td className="py-3 px-4">
+                        <Link
+                          href={`/dashboard/devices/${device.id}`}
+                          className="flex items-center text-primary hover:underline"
+                        >
+                          View Details <ArrowRight className="ml-1 h-4 w-4" />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={6} className="py-4 text-center text-muted-foreground">
+                    No devices found matching your criteria
+                  </td>
+                </tr>
+              )}
+            </tbody>
         </table>
       </div>
       
@@ -260,6 +238,51 @@ export default function DistrictAnalysis({ timeRange }) {
   const [selectedLocation, setSelectedLocation] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [airQualityData, setAirQualityData] = useState([]);
+
+
+  // Add this to your useEffect when selectedDistrict changes
+    useEffect(() => {
+      if (!selectedDistrict) return;
+      
+      const fetchTimeSeriesData = async () => {
+        try {
+          // Get device list from your existing API
+          const response = await fetch(`${config.apiUrl}/network-analysis/districts/${encodeURIComponent(selectedDistrict)}?country=${encodeURIComponent(selectedCountry)}`);
+          const districtData = await response.json();
+          
+          // If you have historical readings in your database, use those devices to fetch historical data
+          // For now, generate sample data based on current readings
+          if (districtData.data && districtData.data.devicesList) {
+            const today = new Date();
+            const timeSeriesData = [];
+            
+            // Generate 7 days of data based on current values with slight variations
+            for (let i = 6; i >= 0; i--) {
+              const date = new Date(today);
+              date.setDate(date.getDate() - i);
+              const dateStr = date.toLocaleDateString();
+              
+              // Use actual current values and add random variations for past days
+              const basePm25 = districtData.data.pm25 || 15;
+              const basePm10 = districtData.data.pm10 || 20;
+              
+              timeSeriesData.push({
+                date: dateStr,
+                pm25: Math.max(1, basePm25 * (0.8 + Math.random() * 0.4)).toFixed(1),
+                pm10: Math.max(1, basePm10 * (0.8 + Math.random() * 0.4)).toFixed(1)
+              });
+            }
+            
+            setAirQualityData(timeSeriesData);
+          }
+        } catch (err) {
+          console.error("Failed to fetch time series data:", err);
+        }
+      };
+
+      fetchTimeSeriesData();
+    }, [selectedDistrict, selectedCountry]);
 
   // Fetch all regions on component mount
   useEffect(() => {
@@ -792,18 +815,19 @@ export default function DistrictAnalysis({ timeRange }) {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Wind className="mr-2 h-5 w-5 text-primary" />
-              Air Quality Trends
-            </CardTitle>
-            <CardDescription>Air quality trends over time in {selectedDistrict}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Wind className="mr-2 h-5 w-5 text-primary" />
+            Air Quality Trends
+          </CardTitle>
+          <CardDescription>Air quality trends over time in {selectedDistrict}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-80">
+            {airQualityData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={pm25TimeSeriesData}>
+                <LineChart data={airQualityData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis />
@@ -813,9 +837,14 @@ export default function DistrictAnalysis({ timeRange }) {
                   <Line type="monotone" dataKey="pm10" name="PM10 (μg/m³)" stroke="#82ca9d" />
                 </LineChart>
               </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">Loading trend data...</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
       </div>
 
       {/* Device List for District */}
