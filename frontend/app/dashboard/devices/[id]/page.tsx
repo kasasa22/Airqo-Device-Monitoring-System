@@ -46,7 +46,8 @@ import {
 import dynamic from "next/dynamic"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import HealthTipsSection from "@/components/health-tips-section";
-import DevicePerformanceMetrics from '@/components/DevicePerformanceMetrics';
+
+
 import { config } from "@/lib/config"
 
 
@@ -695,10 +696,10 @@ export default function DeviceDetailPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-3 mb-4">
+        <TabsList className="grid grid-cols-2 mb-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="data-transmission">Data Transmission</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
+          
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -992,12 +993,12 @@ export default function DeviceDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="performance" className="space-y-4">
+        {/* <TabsContent value="performance" className="space-y-4">
         <DevicePerformanceMetrics
         deviceId={device?.device?.id}
       />
         
-        </TabsContent>
+        </TabsContent> */}
       </Tabs>
     </div>
   
