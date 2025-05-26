@@ -6,7 +6,7 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 import pandas as pd
 import numpy as np
 import statistics
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 default_args = {
     'owner': 'airflow',
@@ -42,6 +42,56 @@ def calculate_uptime(df):
     uptime = min(100, (active_hours / period_hours) * 100)
     
     return uptime
+
+def upsert_device_metrics(results_df, engine):
+    """
+    Insert or update device metrics using PostgreSQL's ON CONFLICT
+    """
+    if results_df.empty:
+        return 0
+    
+    # Convert DataFrame to list of dictionaries
+    records = results_df.to_dict('records')
+    
+    # Build the upsert query
+    upsert_query = text("""
+    INSERT INTO device_daily_metrics (
+        device_key, device_id, date, uptime, data_completeness, 
+        readings_count, expected_readings, avg_battery_voltage, 
+        min_battery_voltage, avg_signal_strength, min_signal_strength, 
+        pm25_avg, pm10_avg, pm25_std, pm10_std, calculated_at
+    ) 
+    VALUES (
+        :device_key, :device_id, :date, :uptime, :data_completeness,
+        :readings_count, :expected_readings, :avg_battery_voltage,
+        :min_battery_voltage, :avg_signal_strength, :min_signal_strength,
+        :pm25_avg, :pm10_avg, :pm25_std, :pm10_std, :calculated_at
+    )
+    ON CONFLICT (device_key, date) 
+    DO UPDATE SET
+        device_id = EXCLUDED.device_id,
+        uptime = EXCLUDED.uptime,
+        data_completeness = EXCLUDED.data_completeness,
+        readings_count = EXCLUDED.readings_count,
+        expected_readings = EXCLUDED.expected_readings,
+        avg_battery_voltage = EXCLUDED.avg_battery_voltage,
+        min_battery_voltage = EXCLUDED.min_battery_voltage,
+        avg_signal_strength = EXCLUDED.avg_signal_strength,
+        min_signal_strength = EXCLUDED.min_signal_strength,
+        pm25_avg = EXCLUDED.pm25_avg,
+        pm10_avg = EXCLUDED.pm10_avg,
+        pm25_std = EXCLUDED.pm25_std,
+        pm10_std = EXCLUDED.pm10_std,
+        calculated_at = EXCLUDED.calculated_at
+    """)
+    
+    # Execute the upsert for each record
+    with engine.connect() as conn:
+        with conn.begin():
+            for record in records:
+                conn.execute(upsert_query, record)
+    
+    return len(records)
 
 def calculate_device_daily_metrics():
     """
@@ -142,14 +192,58 @@ def calculate_device_daily_metrics():
     # Create DataFrame from results
     results_df = pd.DataFrame(results)
     
-    # Save to database
+    # Save to database using upsert to handle duplicates
     if not results_df.empty:
-        results_df.to_sql('device_daily_metrics', engine, if_exists='append', index=False)
-        print(f"Saved {len(results_df)} daily metric records to the database")
+        records_saved = upsert_device_metrics(results_df, engine)
+        print(f"Upserted {records_saved} daily metric records to the database")
     else:
         print("No daily metrics calculated - dataset is empty")
+        records_saved = 0
     
-    return len(results_df) if not results_df.empty else 0
+    return records_saved
+
+def upsert_health_scores(results_df, engine):
+    """
+    Insert or update device health scores using PostgreSQL's ON CONFLICT
+    """
+    if results_df.empty:
+        return 0
+    
+    # Convert DataFrame to list of dictionaries
+    records = results_df.to_dict('records')
+    
+    # Build the upsert query - using device_key and date from calculated_at for uniqueness
+    upsert_query = text("""
+    INSERT INTO device_health_scores (
+        device_key, device_id, health_score, uptime_score, data_completeness_score,
+        battery_health_score, signal_quality_score, failure_days_count,
+        days_analyzed, uptime_stability, calculated_at
+    ) 
+    VALUES (
+        :device_key, :device_id, :health_score, :uptime_score, :data_completeness_score,
+        :battery_health_score, :signal_quality_score, :failure_days_count,
+        :days_analyzed, :uptime_stability, :calculated_at
+    )
+    ON CONFLICT (device_key, calculated_at) 
+    DO UPDATE SET
+        device_id = EXCLUDED.device_id,
+        health_score = EXCLUDED.health_score,
+        uptime_score = EXCLUDED.uptime_score,
+        data_completeness_score = EXCLUDED.data_completeness_score,
+        battery_health_score = EXCLUDED.battery_health_score,
+        signal_quality_score = EXCLUDED.signal_quality_score,
+        failure_days_count = EXCLUDED.failure_days_count,
+        days_analyzed = EXCLUDED.days_analyzed,
+        uptime_stability = EXCLUDED.uptime_stability
+    """)
+    
+    # Execute the upsert for each record
+    with engine.connect() as conn:
+        with conn.begin():
+            for record in records:
+                conn.execute(upsert_query, record)
+    
+    return len(records)
 
 def calculate_device_health_scores():
     """
@@ -280,14 +374,63 @@ def calculate_device_health_scores():
     # Create DataFrame from results
     results_df = pd.DataFrame(device_health)
     
-    # Save to database
+    # Save to database using upsert
     if not results_df.empty:
-        results_df.to_sql('device_health_scores', engine, if_exists='append', index=False)
-        print(f"Saved {len(results_df)} device health scores to the database")
+        records_saved = upsert_health_scores(results_df, engine)
+        print(f"Upserted {records_saved} device health scores to the database")
     else:
         print("No health scores calculated - dataset is empty")
+        records_saved = 0
     
-    return len(results_df) if not results_df.empty else 0
+    return records_saved
+
+def upsert_maintenance_effectiveness(results_df, engine):
+    """
+    Insert or update maintenance effectiveness using PostgreSQL's ON CONFLICT
+    """
+    if results_df.empty:
+        return 0
+    
+    # Convert DataFrame to list of dictionaries
+    records = results_df.to_dict('records')
+    
+    # Build the upsert query
+    upsert_query = text("""
+    INSERT INTO maintenance_effectiveness (
+        device_key, device_id, maintenance_date, uptime_before, uptime_after,
+        uptime_improvement, data_completeness_before, data_completeness_after,
+        data_completeness_improvement, days_before, days_after,
+        effectiveness_score, outcome, calculated_at
+    ) 
+    VALUES (
+        :device_key, :device_id, :maintenance_date, :uptime_before, :uptime_after,
+        :uptime_improvement, :data_completeness_before, :data_completeness_after,
+        :data_completeness_improvement, :days_before, :days_after,
+        :effectiveness_score, :outcome, :calculated_at
+    )
+    ON CONFLICT (device_key, maintenance_date) 
+    DO UPDATE SET
+        device_id = EXCLUDED.device_id,
+        uptime_before = EXCLUDED.uptime_before,
+        uptime_after = EXCLUDED.uptime_after,
+        uptime_improvement = EXCLUDED.uptime_improvement,
+        data_completeness_before = EXCLUDED.data_completeness_before,
+        data_completeness_after = EXCLUDED.data_completeness_after,
+        data_completeness_improvement = EXCLUDED.data_completeness_improvement,
+        days_before = EXCLUDED.days_before,
+        days_after = EXCLUDED.days_after,
+        effectiveness_score = EXCLUDED.effectiveness_score,
+        outcome = EXCLUDED.outcome,
+        calculated_at = EXCLUDED.calculated_at
+    """)
+    
+    # Execute the upsert for each record
+    with engine.connect() as conn:
+        with conn.begin():
+            for record in records:
+                conn.execute(upsert_query, record)
+    
+    return len(records)
 
 def analyze_maintenance_effectiveness():
     """
@@ -452,14 +595,15 @@ def analyze_maintenance_effectiveness():
     # Create DataFrame from results
     results_df = pd.DataFrame(results)
     
-    # Save to database
+    # Save to database using upsert
     if not results_df.empty:
-        results_df.to_sql('maintenance_effectiveness', engine, if_exists='append', index=False)
-        print(f"Saved {len(results_df)} maintenance effectiveness records to the database")
+        records_saved = upsert_maintenance_effectiveness(results_df, engine)
+        print(f"Upserted {records_saved} maintenance effectiveness records to the database")
     else:
         print("No maintenance effectiveness metrics calculated - dataset is empty")
+        records_saved = 0
     
-    return len(results_df) if not results_df.empty else 0
+    return records_saved
 
 def calculate_failure_predictions():
     """
@@ -622,7 +766,7 @@ def calculate_failure_predictions():
     # Create DataFrame from results
     results_df = pd.DataFrame(failure_predictions)
     
-    # Save to database
+    # Save to database (using replace since we want fresh predictions each time)
     if not results_df.empty:
         results_df.to_sql('device_failure_predictions', engine, if_exists='replace', index=False)
         print(f"Saved {len(results_df)} failure predictions to the database")
@@ -636,7 +780,7 @@ with DAG(
     'device_performance_analytics',
     default_args=default_args,
     description='Calculate device performance metrics and analytics',
-    schedule_interval=timedelta(hours=3),
+    schedule_interval=timedelta(hours=1),
     start_date=datetime(2025, 4, 1),
     catchup=False,
     tags=['airqo', 'analytics', 'device_monitoring'],
