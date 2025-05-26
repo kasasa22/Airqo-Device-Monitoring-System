@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text, func, desc
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import statistics
 from pydantic import BaseModel
 import json
@@ -87,7 +87,7 @@ def get_device_performance(
         device_dict = dict(device._mapping)
         
         # Determine date range based on timeRange parameter
-        end_date = datetime.now()
+        end_date = datetime.now(timezone.utc)  # Make timezone-aware with UTC
         if timeRange == "7days":
             start_date = end_date - timedelta(days=7)
         elif timeRange == "30days":
@@ -96,8 +96,9 @@ def get_device_performance(
             start_date = end_date - timedelta(days=90)
         elif timeRange == "custom" and startDate and endDate:
             try:
-                start_date = datetime.strptime(startDate, "%Y-%m-%d")
-                end_date = datetime.strptime(endDate, "%Y-%m-%d")
+                # Make custom dates timezone-aware too
+                start_date = datetime.strptime(startDate, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                end_date = datetime.strptime(endDate, "%Y-%m-%d").replace(tzinfo=timezone.utc)
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
         else:
