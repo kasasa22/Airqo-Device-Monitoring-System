@@ -46,7 +46,8 @@ import {
 import dynamic from "next/dynamic"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import HealthTipsSection from "@/components/health-tips-section";
-import DevicePerformanceMetrics from '@/components/DevicePerformanceMetrics';
+
+
 import { config } from "@/lib/config"
 
 
@@ -695,10 +696,10 @@ export default function DeviceDetailPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-3 mb-4">
+        <TabsList className="grid grid-cols-2 mb-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="data-transmission">Data Transmission</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
+          
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -979,48 +980,7 @@ export default function DeviceDetailPage() {
                 ) : null
               ) : null}
               </div>
-              {/* New AI Analysis section starts here */}
-              <div className="mt-6 border-t pt-6">
-                <h3 className="text-md font-medium mb-4 flex items-center">
-                  <Activity className="mr-2 h-5 w-5 text-primary" />
-                  Device Transmission Analysis
-                </h3>
-                
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  {analysisLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <RefreshCw className="h-8 w-8 text-primary animate-spin mb-2" />
-                      <p className="ml-2">Analyzing transmission patterns...</p>
-                    </div>
-                  ) : analysis ? (
-                    <div className="prose max-w-full space-y-2">
-                      <div dangerouslySetInnerHTML={{ __html: analysis.replace(/\n/g, '<br/>') }} />
-                      <div className="pt-4 border-t mt-4">
-                        <Button variant="outline" size="sm" onClick={() => setAnalysis(null)}>
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Generate New Analysis
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-8">
-                      <Button 
-                        onClick={() => {
-                          setAnalysisLoading(true);
-                          generateDataTransmissionAnalysis().then(result => {
-                            setAnalysis(result);
-                            setAnalysisLoading(false);
-                          });
-                        }}
-                      >
-                        Analyze Device Transmission
-                      </Button>
-                      <p className="text-sm text-gray-500 mt-2">Generate AI assessment of device connectivity and data reliability</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              {/* New AI Analysis section ends here */}
+            
             </CardContent>
             <CardFooter className="bg-gray-50 border-t px-4 py-3">
 
@@ -1033,12 +993,12 @@ export default function DeviceDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="performance" className="space-y-4">
+        {/* <TabsContent value="performance" className="space-y-4">
         <DevicePerformanceMetrics
         deviceId={device?.device?.id}
       />
         
-        </TabsContent>
+        </TabsContent> */}
       </Tabs>
     </div>
   

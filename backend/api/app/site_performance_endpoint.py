@@ -347,8 +347,14 @@ def get_location_analytics(
         
         for row in aqi_result:
             aqi_dict = dict(row._mapping)
-            aqi_category = aqi_dict.get('aqi_category', '').lower()
+            aqi_category = aqi_dict.get('aqi_category')
             site_count = aqi_dict.get('site_count', 0)
+
+                # Handle None values properly
+            if aqi_category is None:
+                continue  # Skip None categories
+                
+            aqi_category = aqi_category.lower()
             
             if aqi_category == 'good':
                 aqi_distribution['good'] = site_count

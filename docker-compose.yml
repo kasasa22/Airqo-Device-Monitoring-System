@@ -50,6 +50,8 @@ x-airflow-common:
       condition: service_healthy
     postgres:
       condition: service_healthy
+  networks:
+    - airqo-network
 
 services:
   postgres:
@@ -69,6 +71,8 @@ services:
       interval: 5s
       retries: 5
     restart: always
+    networks:
+      - airqo-network
   
   pgadmin:
     image: dpage/pgadmin4
@@ -81,6 +85,8 @@ services:
     depends_on:
       - postgres
     restart: always
+    networks:
+      - airqo-network
 
   redis:
     image: redis:latest
@@ -92,6 +98,8 @@ services:
       timeout: 30s
       retries: 50
     restart: always
+    networks:
+      - airqo-network
 
   airflow-webserver:
     <<: *airflow-common
@@ -292,6 +300,8 @@ services:
       - analytics
     entrypoint: bash
     command: -c "sleep infinity"
+    networks:
+      - airqo-network
 
   # FastAPI service for serving data
   fastapi:
@@ -299,12 +309,20 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/api:/app  # Updated path to match your project structure
+      - ./backend/api:/app
     environment:
       - DATABASE_URL=postgresql://airflow:airflow@postgres:5432/airflow
+      # Add these CORS environment variables
+      - CORS_ALLOW_ORIGINS=http://localhost:3000,http://frontend:3000,http://srv828289.hstgr.cloud:3000,http://172.18.0.6:3000,http://airqo-device-monitoring-system-frontend-1:3000,*
+      - CORS_ALLOW_CREDENTIALS=true
+      - CORS_ALLOW_METHODS=*
+      - CORS_ALLOW_HEADERS=*
     depends_on:
       - postgres
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - airqo-network
+
   # Next.js frontend
   frontend:
     build: ./frontend
@@ -313,12 +331,20 @@ services:
     volumes:
       - ./frontend:/app
     environment:
+      # Internal API URL for server-to-server communication within Docker
       - API_URL=http://fastapi:8000
+      # Public API URL for browser-based API calls
+      - NEXT_PUBLIC_API_URL=http://srv828289.hstgr.cloud:8000
+      - NEXT_PUBLIC_INTERNAL_API_URL=http://fastapi:8000
     depends_on:
       - fastapi
-  
     command: npm run dev
-    
+    networks:
+      - airqo-network
     
 volumes:
   postgres-db-volume:
+
+networks:
+  airqo-network:
+    driver: bridge

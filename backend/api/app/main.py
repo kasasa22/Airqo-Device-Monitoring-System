@@ -67,7 +67,13 @@ app.add_middleware(
         # It's good practice to include HTTPS variants as well
         "https://srv792913.hstgr.cloud:3000",
         # You might also want to add a wildcard for all subdomains
-        "http://*.hstgr.cloud:3000"
+        "http://*.hstgr.cloud:3000",
+        "http://srv828289.hstgr.cloud:3000",
+        "https://srv828289.hstgr.cloud:3000",
+        "http://srv828289.hstgr.cloud:8000",
+        "http://frontend:3000",
+        "http://172.18.0.6:3000",
+
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -760,6 +766,10 @@ def get_valid_device_locations(db=Depends(get_db)):
      
      
      
+
+
+
+ 
      
      
      # my code that has my routes
@@ -939,6 +949,223 @@ def create_user(
 def get_users(db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
     users = db.query(models.User).all()
     return users
+
+
+# Add these endpoints to your FastAPI main.py file
+
+# Get current user profile endpoint
+@app.get("/users/me/", response_model=schemas.User)
+@app.get("/profile/", response_model=schemas.User)
+@app.get("/auth/me/", response_model=schemas.User)
+def get_current_user_profile(current_user: models.User = Depends(get_current_user)):
+    """Get the current authenticated user's profile"""
+    return current_user
+
+# Update current user profile endpoint
+@app.put("/users/me/", response_model=schemas.User)
+@app.put("/profile/", response_model=schemas.User)
+@app.put("/auth/me/", response_model=schemas.User)
+def update_current_user_profile(
+    user_update: schemas.UserUpdate,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Update the current authenticated user's profile"""
+    
+    # Check if email is being changed and if it's already taken by another user
+    if user_update.email and user_update.email != current_user.email:
+        existing_user = db.query(models.User).filter(
+            models.User.email == user_update.email,
+            models.User.id != current_user.id
+        ).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered to another user"
+            )
+    
+    # Update basic profile fields
+    if user_update.first_name is not None:
+        current_user.first_name = user_update.first_name
+    if user_update.last_name is not None:
+        current_user.last_name = user_update.last_name
+    if user_update.email is not None:
+        current_user.email = user_update.email
+    if user_update.phone is not None:
+        current_user.phone = user_update.phone
+    if user_update.location is not None:
+        current_user.location = user_update.location
+    
+    # Handle password change if provided
+    if user_update.new_password and user_update.current_password:
+        # Verify current password
+        if not verify_password(user_update.current_password, current_user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is incorrect"
+            )
+        
+        # Update to new password
+        current_user.password_hash = get_password_hash(user_update.new_password)
+    
+    # Update timestamp
+    current_user.updated_at = datetime.datetime.utcnow()
+    
+    # Save changes
+    db.commit()
+    db.refresh(current_user)
+    
+    return current_user
+
+# Update specific user profile endpoint (for admin use)
+@app.put("/users/{user_id}/", response_model=schemas.User)
+def update_user_profile(
+    user_id: int,
+    user_update: schemas.UserUpdate,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Update a specific user's profile (Admin/SuperAdmin only)"""
+    
+    # Check if current user has permission to update other users
+    if current_user.role.lower() not in ["administrator", "superadmin"] and current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this user's profile"
+        )
+    
+    # Get the user to update
+    user_to_update = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user_to_update:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Check if email is being changed and if it's already taken
+    if user_update.email and user_update.email != user_to_update.email:
+        existing_user = db.query(models.User).filter(
+            models.User.email == user_update.email,
+            models.User.id != user_id
+        ).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered to another user"
+            )
+    
+    # Update fields
+    if user_update.first_name is not None:
+        user_to_update.first_name = user_update.first_name
+    if user_update.last_name is not None:
+        user_to_update.last_name = user_update.last_name
+    if user_update.email is not None:
+        user_to_update.email = user_update.email
+    if user_update.phone is not None:
+        user_to_update.phone = user_update.phone
+    if user_update.location is not None:
+        user_to_update.location = user_update.location
+    
+    # Only superadmin can change roles and status
+    if current_user.role.lower() == "superadmin":
+        if user_update.role is not None:
+            user_to_update.role = user_update.role
+        if user_update.status is not None:
+            user_to_update.status = user_update.status
+    
+    # Handle password change (admin can reset passwords)
+    if user_update.new_password:
+        if current_user.id == user_id and user_update.current_password:
+            # User updating their own password - verify current password
+            if not verify_password(user_update.current_password, user_to_update.password_hash):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Current password is incorrect"
+                )
+        elif current_user.role.lower() == "superadmin":
+            # Superadmin can reset any password without current password
+            pass
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot change password for other users"
+            )
+        
+        user_to_update.password_hash = get_password_hash(user_update.new_password)
+    
+    # Update timestamp
+    user_to_update.updated_at = datetime.datetime.utcnow()
+    
+    # Save changes
+    db.commit()
+    db.refresh(user_to_update)
+    
+    return user_to_update
+
+# Delete user endpoint (SuperAdmin only)
+@app.delete("/users/{user_id}/")
+def delete_user(
+    user_id: int,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Delete a user (SuperAdmin only)"""
+    
+    if current_user.role.lower() != "superadmin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only superadmin can delete users"
+        )
+    
+    # Prevent self-deletion
+    if current_user.id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own account"
+        )
+    
+    user_to_delete = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user_to_delete:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    db.delete(user_to_delete)
+    db.commit()
+    
+    return {"message": "User deleted successfully"}
+
+# Change password endpoint (separate endpoint for password changes)
+@app.post("/users/change-password/")
+def change_password(
+    password_change: schemas.PasswordChange,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Change current user's password"""
+    
+    # Verify current password
+    if not verify_password(password_change.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    # Validate new password
+    if len(password_change.new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be at least 6 characters long"
+        )
+    
+    # Update password
+    current_user.password_hash = get_password_hash(password_change.new_password)
+    current_user.updated_at = datetime.datetime.utcnow()
+    
+    db.commit()
+    
+    return {"message": "Password changed successfully"}
 
 @app.get("/device-detail/{device_id}")
 def get_device_detail(device_id: str, db=Depends(get_db)):

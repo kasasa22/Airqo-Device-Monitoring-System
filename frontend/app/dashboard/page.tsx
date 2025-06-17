@@ -374,7 +374,7 @@ export default function DashboardPage() {
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="overflow-hidden border-l-4 border-l-primary hover:shadow-md transition-shadow">
           <CardHeader className="pb-2 bg-gradient-to-r from-primary/10 to-transparent">
             <CardTitle className="text-sm font-medium flex items-center">
@@ -443,6 +443,44 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
+
+              <Card className="overflow-hidden border-l-4 border-l-amber-500 hover:shadow-md transition-shadow">
+        <CardHeader className="pb-2 bg-gradient-to-r from-amber-500/10 to-transparent">
+          <CardTitle className="text-sm font-medium flex items-center">
+            <Package className="mr-2 h-5 w-5 text-amber-500" />
+            Not Deployed
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="text-3xl font-bold">
+            {isLoading ? '...' : deviceCounts.not_deployed}
+          </div>
+          <div className="flex items-center mt-1">
+            <div className="h-2 bg-amber-500 rounded-full" style={{ width: `${deviceCounts.total_devices > 0 ? Math.round((deviceCounts.not_deployed / deviceCounts.total_devices) * 100) : 0}%` }}></div>
+            <span className="text-xs text-muted-foreground ml-2">{deviceCounts.total_devices > 0 ? Math.round((deviceCounts.not_deployed / deviceCounts.total_devices) * 100) : 0}%</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden border-l-4 border-l-purple-500 hover:shadow-md transition-shadow">
+        <CardHeader className="pb-2 bg-gradient-to-r from-purple-500/10 to-transparent">
+          <CardTitle className="text-sm font-medium flex items-center">
+            <AlertOctagon className="mr-2 h-5 w-5 text-purple-500" />
+            Recalled Devices
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="text-3xl font-bold">
+            {isLoading ? '...' : deviceCounts.recalled_devices}
+          </div>
+          <div className="flex items-center mt-1">
+            <div className="h-2 bg-purple-500 rounded-full" style={{ width: `${deviceCounts.total_devices > 0 ? Math.round((deviceCounts.recalled_devices / deviceCounts.total_devices) * 100) : 0}%` }}></div>
+            <span className="text-xs text-muted-foreground ml-2">{deviceCounts.total_devices > 0 ? Math.round((deviceCounts.recalled_devices / deviceCounts.total_devices) * 100) : 0}%</span>
+          </div>
+        </CardContent>
+      </Card>
+
+
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -502,6 +540,7 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+  
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

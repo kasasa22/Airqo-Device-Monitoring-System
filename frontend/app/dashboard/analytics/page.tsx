@@ -42,7 +42,7 @@ import CountryAnalysisPage from "./CountryAnalysisPage"
 import DistrictAnalysisPage from "./DistrictAnalysisPage"
 
 // API endpoint base URL
-const API_BASE_URL = "http://srv792913.hstgr.cloud:8000";
+const API_BASE_URL = "http://srv828289.hstgr.cloud:8000";
 
 // AQI color mapping - keeping this as it's configuration, not static data
 const aqiColors = {
